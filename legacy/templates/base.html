@@ -255,6 +255,29 @@
             <i class="fas fa-file-alt"></i> {{ t('nav_forms') }}
         </a>
     </nav>
+    {% if current_user and current_user.id %}
+    <div style="margin-top:auto;padding:10px 14px;border-top:1px solid rgba(255,255,255,0.1);background:rgba(0,0,0,0.2);">
+        <a href="{{ url_for('profile_view') }}"
+           style="display:flex;align-items:center;gap:8px;margin-bottom:6px;text-decoration:none;padding:4px;border-radius:4px;transition:background 0.15s;"
+           onmouseover="this.style.background='rgba(255,255,255,0.08)'"
+           onmouseout="this.style.background='transparent'"
+           title="Профайл харах / Нууц үг солих">
+            <div style="width:28px;height:28px;border-radius:50%;background:#4CAF50;display:flex;align-items:center;justify-content:center;color:white;font-weight:600;font-size:0.75rem;">
+                {{ (current_user.email or 'U')[0]|upper }}
+            </div>
+            <div style="overflow:hidden;flex:1;">
+                <div style="color:#fff;font-size:0.72rem;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ current_user.email or '—' }}</div>
+                <div style="color:rgba(255,255,255,0.5);font-size:0.6rem;text-transform:uppercase;letter-spacing:0.3px;">{{ current_user.role or 'viewer' }}</div>
+            </div>
+            <i class="fas fa-cog" style="color:rgba(255,255,255,0.4);font-size:0.7rem;"></i>
+        </a>
+        <form method="POST" action="{{ url_for('logout_view') }}" style="margin:0;">
+            <button type="submit" style="width:100%;background:rgba(244,67,54,0.15);border:1px solid rgba(244,67,54,0.3);color:#ff7c75;font-size:0.7rem;padding:5px 8px;border-radius:4px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px;">
+                <i class="fas fa-sign-out-alt"></i> Гарах
+            </button>
+        </form>
+    </div>
+    {% endif %}
     <div class="pb-3" style="padding:8px 14px;">
         <small class="text-white-50" style="font-size:0.62rem;">{{ company.name }} · {{ now.year }}</small>
     </div>

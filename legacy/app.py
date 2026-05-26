@@ -1,17 +1,30 @@
-from flask import Flask, render_template, request, jsonify, redirect, url_for, flash, session
+from flask import Flask, render_template, request, jsonify, redirect, url_for, flash, session, g
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime, date
 import json
 from translations import get_t
 
 import os as _os
+
+# Load .env.local from project root (one level up from legacy/)
+try:
+    from dotenv import load_dotenv
+    _ENV_FILE = _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), '..', '.env.local')
+    load_dotenv(_ENV_FILE)
+except ImportError:
+    pass  # dotenv optional in production
+
 app = Flask(__name__)
 _DB_PATH = _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), 'instance', 'accounting.db')
 _os.makedirs(_os.path.dirname(_DB_PATH), exist_ok=True)
 app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{_DB_PATH}'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-app.config['SECRET_KEY'] = 'tumenaccounting2026'
+app.config['SECRET_KEY'] = _os.environ.get('APP_SECRET_KEY', 'tumenaccounting2026')
 db = SQLAlchemy(app)
+
+# Supabase Auth integration (before_request guard, /login + /logout helpers)
+import auth as _auth
+_auth.init(app)
 
 # ── SQLite Кирилл үсгийн case-insensitive хайлт ──────────────────────────────
 from sqlalchemy import event as _sa_event
@@ -133,6 +146,93 @@ def set_lang(lang):
     if lang in ('mn', 'en'):
         session['lang'] = lang
     return redirect(request.referrer or url_for('index'))
+
+
+# ── Healthcheck (public) ────────────────────────────────────────────────────
+@app.route('/healthz')
+def healthz():
+    return {'status': 'ok'}, 200
+
+
+# ── Authentication: /login + /logout ────────────────────────────────────────
+@app.route('/login', methods=['GET', 'POST'])
+def login_view():
+    next_url = request.values.get('next') or url_for('index')
+    if request.method == 'POST':
+        email    = (request.form.get('email') or '').strip().lower()
+        password = request.form.get('password') or ''
+        if not email or not password:
+            return render_template('login.html', error='И-мэйл болон нууц үгээ оруулна уу',
+                                   email=email, next_url=next_url)
+        try:
+            payload = _auth.sign_in(email, password)
+        except _auth.AuthError as e:
+            return render_template('login.html', error=str(e),
+                                   email=email, next_url=next_url)
+
+        # Resolve user's company + role
+        access = payload.get('access_token')
+        user   = payload.get('user') or {}
+        company_id, role = _auth.fetch_user_company(user.get('id'), access)
+        if not company_id:
+            # No company assignment → block login
+            return render_template('login.html',
+                error='Энэ хэрэглэгчид компанийн эрх олгогдоогүй байна. Админд хандана уу.',
+                email=email, next_url=next_url)
+
+        _auth.store_session(payload, company_id=company_id, role=role)
+        return redirect(next_url)
+
+    return render_template('login.html', next_url=next_url)
+
+
+@app.route('/logout', methods=['GET', 'POST'])
+def logout_view():
+    token = session.get('sb_access_token')
+    _auth.sign_out(token)
+    _auth.clear_session()
+    session.pop('lang', None)
+    return redirect(url_for('login_view'))
+
+
+# ── Profile: view + change password ─────────────────────────────────────────
+@app.route('/profile', methods=['GET'])
+def profile_view():
+    return render_template('profile.html', user=g.user)
+
+
+@app.route('/profile/change-password', methods=['POST'])
+def profile_change_password():
+    current_password = request.form.get('current_password') or ''
+    new_password     = request.form.get('new_password') or ''
+    confirm_password = request.form.get('confirm_password') or ''
+
+    if not current_password or not new_password:
+        return render_template('profile.html', user=g.user,
+                               error='Бүх талбарыг бөглөнө үү')
+    if new_password != confirm_password:
+        return render_template('profile.html', user=g.user,
+                               error='Шинэ нууц үгүүд таарахгүй байна')
+    if len(new_password) < 8:
+        return render_template('profile.html', user=g.user,
+                               error='Шинэ нууц үг 8+ тэмдэгт байх ёстой')
+    if new_password == current_password:
+        return render_template('profile.html', user=g.user,
+                               error='Шинэ нууц үг хуучнаасаа ялгаатай байх ёстой')
+
+    # Verify current password
+    if not _auth.verify_password(g.user['email'], current_password):
+        return render_template('profile.html', user=g.user,
+                               error='Одоогийн нууц үг буруу байна')
+
+    # Change password using user's own access token
+    try:
+        _auth.update_password(session.get('sb_access_token'), new_password)
+    except _auth.AuthError as e:
+        return render_template('profile.html', user=g.user, error=str(e))
+
+    return render_template('profile.html', user=g.user,
+                           success='Нууц үг амжилттай солигдлоо. Дараа удаа шинэ нууц үгээр нэвтэрнэ үү.')
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -4551,4 +4651,5 @@ def salary_emp_edit(emp_id):
 
 
 if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    _port = int(_os.environ.get('FLASK_RUN_PORT', '5000'))
+    app.run(debug=True, host='0.0.0.0', port=_port)
