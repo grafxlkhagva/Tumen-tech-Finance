@@ -1,11 +1,0 @@
-Traceback (most recent call last):
-  File "<string>", line 24, in <module>
-    print('Sheet names in order:', names)
-    ~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "C:\Users\natsa\AppData\Local\Python\pythoncore-3.14-64\Lib\encodings\cp1252.py", line 19, in encode
-    return codecs.charmap_encode(input,self.errors,encoding_table)[0]
-           ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-UnicodeEncodeError: 'charmap' codec can't encode characters in position 10-15: character maps to <undefined>
-drawing6 rids: ['rId1']
-rels6: <?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="../media/image1.png"/></Relationships>
-Sheet names in order: 

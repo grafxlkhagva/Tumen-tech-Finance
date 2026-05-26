@@ -1,5 +1,0 @@
-sheet6 -> drawing6 -> ['image1.png']
-sheet7 -> drawing7 -> ['image2.png']
-sheet8 -> drawing8 -> ['image3.png']
-sheet9 -> drawing9 -> ['image2.png']
-sheet10 -> drawing10 -> ['image4.png']
