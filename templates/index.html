@@ -1,0 +1,376 @@
+{% extends "base.html" %}
+{% block title %}Санхүүгийн ерөнхий тайлан{% endblock %}
+{% block page_title %}Санхүүгийн ерөнхий тайлан{% endblock %}
+
+{% block topbar_actions %}
+<span class="text-muted small me-3">{{ company.name_upper }} · {{ now.year }} он</span>
+<a href="{{ url_for('add_journal') }}" class="btn btn-primary btn-sm">
+    <i class="fas fa-plus me-1"></i>Гүйлгээ нэмэх
+</a>
+{% endblock %}
+
+{% block content %}
+{% set mn = {1:'1-р сар',2:'2-р сар',3:'3-р сар',4:'4-р сар',5:'5-р сар',6:'6-р сар',
+             7:'7-р сар',8:'8-р сар',9:'9-р сар',10:'10-р сар',11:'11-р сар',12:'12-р сар'} %}
+
+{# ══════════════ МӨНГӨН ХӨРӨНГИЙН ХЭСЭГ ══════════════ #}
+<div class="dash-section-header">
+    <i class="fas fa-university text-primary"></i>
+    <span>Мөнгөн хөрөнгийн хөдөлгөөн — Банкны хуулга</span>
+    <a href="{{ url_for('cash') }}" class="ms-auto btn btn-link btn-sm text-muted p-0">Дэлгэрэнгүй →</a>
+</div>
+
+<div class="row g-3 mb-3">
+    <div class="col-md-3">
+        <div class="stat-card bg-green">
+            <div class="icon"><i class="fas fa-arrow-circle-down"></i></div>
+            <h6>Нийт орлого</h6>
+            <h2 class="num">{{ "{:,.0f}".format(stats.cash_income) }}₮</h2>
+            <small style="opacity:.8">{{ stats.cash_count }} гүйлгээ</small>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="stat-card bg-red">
+            <div class="icon"><i class="fas fa-arrow-circle-up"></i></div>
+            <h6>Нийт зарлага</h6>
+            <h2 class="num">{{ "{:,.0f}".format(stats.cash_expense) }}₮</h2>
+            <small style="opacity:.8">&nbsp;</small>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="stat-card {% if stats.cash_net >= 0 %}bg-blue{% else %}bg-orange{% endif %}">
+            <div class="icon"><i class="fas fa-wallet"></i></div>
+            <h6>Цэвэр урсгал</h6>
+            <h2 class="num">{{ "{:,.0f}".format(stats.cash_net) }}₮</h2>
+            {% set margin = (stats.cash_net / stats.cash_income * 100) if stats.cash_income > 0 else 0 %}
+            <small style="opacity:.8">{{ "{:+.1f}".format(margin) }}% маржин</small>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="stat-card bg-purple">
+            <div class="icon"><i class="fas fa-users"></i></div>
+            <h6>Идэвхтэй харилцагч</h6>
+            <h2>{{ stats.total_partners }}</h2>  {# count only, no blur #}
+            <small style="opacity:.8">&nbsp;</small>
+        </div>
+    </div>
+</div>
+
+<div class="row g-3 mb-4">
+    {# Monthly bar chart #}
+    <div class="col-md-7">
+        <div class="card h-100">
+            <div class="card-header"><i class="fas fa-chart-bar me-2"></i>Сарын орлого / зарлага</div>
+            <div class="card-body pb-2">
+                {% if stats.monthly_cash %}
+                {% set max_val = [stats.cash_income, stats.cash_expense] | max %}
+                {% for row in stats.monthly_cash %}
+                {% set inc = (row.income or 0) %}
+                {% set exp = (row.expense or 0) %}
+                {% set inc_pct = (inc / max_val * 100) if max_val > 0 else 0 %}
+                {% set exp_pct = (exp / max_val * 100) if max_val > 0 else 0 %}
+                <div class="mb-2">
+                    <div class="d-flex justify-content-between small mb-1">
+                        <span class="fw-semibold">{{ mn.get(row.month, row.month ~ '-р сар') }}</span>
+                        <span>
+                            <span class="text-success me-2 num">↑ {{ "{:,.0f}".format(inc) }}₮</span>
+                            <span class="text-danger num">↓ {{ "{:,.0f}".format(exp) }}₮</span>
+                        </span>
+                    </div>
+                    <div class="position-relative" style="height:9px;background:#e9ecef;border-radius:6px;overflow:hidden;">
+                        <div style="position:absolute;left:0;top:0;height:100%;width:{{ inc_pct|round(1) }}%;background:linear-gradient(90deg,#2E7D32,#66BB6A);border-radius:6px;"></div>
+                    </div>
+                    <div class="position-relative mt-1" style="height:6px;background:#e9ecef;border-radius:6px;overflow:hidden;">
+                        <div style="position:absolute;left:0;top:0;height:100%;width:{{ exp_pct|round(1) }}%;background:linear-gradient(90deg,#C62828,#EF5350);border-radius:6px;opacity:.75;"></div>
+                    </div>
+                </div>
+                {% endfor %}
+                {% else %}
+                <div class="text-center text-muted py-4">Банкны хуулга байхгүй</div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    {# Bank + top partners #}
+    <div class="col-md-5">
+        <div class="card mb-2">
+            <div class="card-header py-2 d-flex align-items-center">
+                <i class="fas fa-university me-2"></i>Банкны үлдэгдэл
+                <a href="{{ url_for('cash_bank_summary') }}" class="ms-auto btn btn-link btn-sm p-0 text-muted" style="font-size:.75rem;">Дэлгэрэнгүй →</a>
+            </div>
+            <div class="card-body p-0">
+                <table class="table table-sm mb-0" style="font-size:.8rem;">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Банк</th>
+                            <th class="text-end">Эхний үлдэгдэл</th>
+                            <th class="text-end text-success">+ Орлого</th>
+                            <th class="text-end text-danger">− Зарлага</th>
+                            <th class="text-end fw-bold">Эцсийн үлдэгдэл</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for b in stats.bank_balances %}
+                        <tr>
+                            <td>
+                                <span class="badge bg-secondary me-1" style="font-size:.65rem;">{{ b.code }}</span>
+                                {{ b.label }}
+                            </td>
+                            <td class="text-end num text-muted">{{ "{:,.0f}".format(b.open) }}</td>
+                            <td class="text-end num text-success">{{ "{:,.0f}".format(b.income) }}</td>
+                            <td class="text-end num text-danger">{{ "{:,.0f}".format(b.expense) }}</td>
+                            <td class="text-end num fw-bold {% if b.close < 0 %}text-danger{% else %}text-primary{% endif %}">
+                                {{ "{:,.0f}".format(b.close) }}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                    <tfoot class="table-primary">
+                        <tr class="fw-bold">
+                            <td>Нийт</td>
+                            <td class="text-end num">{{ "{:,.0f}".format(stats.bank_totals.open) }}</td>
+                            <td class="text-end num text-success">{{ "{:,.0f}".format(stats.bank_totals.income) }}</td>
+                            <td class="text-end num text-danger">{{ "{:,.0f}".format(stats.bank_totals.expense) }}</td>
+                            <td class="text-end num {% if stats.bank_totals.close < 0 %}text-danger{% endif %}">
+                                {{ "{:,.0f}".format(stats.bank_totals.close) }}
+                            </td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        </div>
+        {# Top 3 partners mini #}
+        <div class="card">
+            <div class="card-header py-2 d-flex justify-content-between">
+                <span><i class="fas fa-star me-1 text-warning"></i>Тэргүүлэх харилцагч</span>
+                <a href="{{ url_for('partners') }}" class="btn btn-link btn-sm p-0 text-muted" style="font-size:.75rem;">Бүгд →</a>
+            </div>
+            <div class="card-body p-0">
+                {% for p in stats.top_partners[:4] %}
+                {% set net = (p.income or 0) - (p.expense or 0) %}
+                {% set pct = ((p.income or 0) / stats.cash_income * 100) if stats.cash_income > 0 else 0 %}
+                <div class="px-3 py-2 border-bottom">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <span class="small fw-semibold" style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+                            {{ loop.index }}. {{ p.partner_name }}
+                        </span>
+                        <span class="small num {{ 'text-success' if net >= 0 else 'text-danger' }}">
+                            {{ "{:,.0f}".format(p.income or 0) }}₮
+                        </span>
+                    </div>
+                    <div style="height:4px;background:#e9ecef;border-radius:4px;overflow:hidden;margin-top:3px;">
+                        <div style="height:100%;width:{{ pct|round(1) }}%;background:linear-gradient(90deg,#1565C0,#42A5F5);border-radius:4px;"></div>
+                    </div>
+                </div>
+                {% else %}
+                <div class="text-center text-muted small py-3">Харилцагч байхгүй</div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+
+{# ══════════════ АВЛАГА / ӨГЛӨГ ══════════════ #}
+<div class="dash-section-header">
+    <i class="fas fa-exchange-alt text-success"></i>
+    <span>Авлага / Өглөгийн тайлан</span>
+</div>
+
+<div class="row g-3 mb-4">
+    <div class="col-md-3">
+        <a href="{{ url_for('receivables') }}" class="text-decoration-none">
+        <div class="stat-card" style="background:linear-gradient(135deg,#0277BD,#29B6F6);">
+            <div class="icon"><i class="fas fa-file-invoice"></i></div>
+            <h6>Нийт авлага</h6>
+            <h2 class="num" style="font-size:1.5rem">{{ "{:,.0f}".format(stats.recv_total) }}₮</h2>
+            <small style="opacity:.8">{{ stats.recv_open }} нээлттэй</small>
+        </div></a>
+    </div>
+    <div class="col-md-3">
+        <a href="{{ url_for('receivables', status='open') }}" class="text-decoration-none">
+        <div class="stat-card bg-orange">
+            <div class="icon"><i class="fas fa-clock"></i></div>
+            <h6>Авлагын үлдэгдэл</h6>
+            <h2 class="num">{{ "{:,.0f}".format(stats.recv_remaining) }}₮</h2>
+            <small style="opacity:.8">Авах дүн</small>
+        </div></a>
+    </div>
+    <div class="col-md-3">
+        <a href="{{ url_for('payables') }}" class="text-decoration-none">
+        <div class="stat-card bg-red">
+            <div class="icon"><i class="fas fa-file-invoice-dollar"></i></div>
+            <h6>Нийт өглөг</h6>
+            <h2 class="num">{{ "{:,.0f}".format(stats.pay_total) }}₮</h2>
+            <small style="opacity:.8">{{ stats.pay_open }} нээлттэй</small>
+        </div></a>
+    </div>
+    <div class="col-md-3">
+        <a href="{{ url_for('payables', status='open') }}" class="text-decoration-none">
+        <div class="stat-card bg-teal">
+            <div class="icon"><i class="fas fa-hourglass-half"></i></div>
+            <h6>Өглөгийн үлдэгдэл</h6>
+            <h2 class="num">{{ "{:,.0f}".format(stats.pay_remaining) }}₮</h2>
+            <small style="opacity:.8">Төлөх дүн</small>
+        </div></a>
+    </div>
+</div>
+
+{# ══════════════ НӨАТ хэсэг ══════════════ #}
+<div class="dash-section-header">
+    <i class="fas fa-receipt text-warning"></i>
+    <span>НӨАТ (eBarimt) тайлан</span>
+    <a href="{{ url_for('vat') }}" class="ms-auto btn btn-link btn-sm text-muted p-0">Дэлгэрэнгүй →</a>
+</div>
+
+<div class="row g-3 mb-4">
+    <div class="col-md-4">
+        <div class="stat-card bg-blue">
+            <div class="icon"><i class="fas fa-receipt"></i></div>
+            <h6>Борлуулалтын НӨАТ</h6>
+            <h2 class="num" style="font-size:1.4rem">{{ "{:,.0f}".format(stats.out_vat) }}₮</h2>
+            <small style="opacity:.8">{{ stats.out_cnt }} баримт</small>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="stat-card bg-orange">
+            <div class="icon"><i class="fas fa-shopping-cart"></i></div>
+            <h6>Худалдан авалтын НӨАТ</h6>
+            <h2 class="num" style="font-size:1.4rem">{{ "{:,.0f}".format(stats.in_vat) }}₮</h2>
+            <small style="opacity:.8">{{ stats.in_cnt }} баримт</small>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="stat-card {% if stats.net_vat > 0 %}bg-red{% else %}bg-green{% endif %}">
+            <div class="icon"><i class="fas fa-balance-scale"></i></div>
+            <h6>Төлбөл зохих НӨАТ</h6>
+            <h2 class="num" style="font-size:1.4rem">{{ "{:,.0f}".format(stats.net_vat) }}₮</h2>
+            <small style="opacity:.8">Борлуулалт − Суутгал</small>
+        </div>
+    </div>
+</div>
+
+{# ══════════════ НЯГТЛАН БОДОХ БҮРТГЭЛ ══════════════ #}
+<div class="dash-section-header">
+    <i class="fas fa-book" style="color:#7B1FA2;"></i>
+    <span>Нягтлан бодох бүртгэл</span>
+    <a href="{{ url_for('journals') }}" class="ms-auto btn btn-link btn-sm text-muted p-0">Дэлгэрэнгүй →</a>
+</div>
+
+<div class="row g-3 mb-3">
+    <div class="col-md-4">
+        <div class="row g-2">
+            <div class="col-6">
+                <a href="{{ url_for('accounts') }}" class="text-decoration-none">
+                <div class="card text-center py-3 idx-stat-card">
+                    <div class="fs-2 fw-bold text-primary">{{ stats.total_accounts }}</div>
+                    <div class="small text-muted">Данс</div>
+                </div></a>
+            </div>
+            <div class="col-6">
+                <a href="{{ url_for('journals') }}?status=posted" class="text-decoration-none">
+                <div class="card text-center py-3 idx-stat-card">
+                    <div class="fs-2 fw-bold text-success">{{ stats.posted_journals }}</div>
+                    <div class="small text-muted">Баталгаажсан</div>
+                </div></a>
+            </div>
+            <div class="col-6">
+                <a href="{{ url_for('journals') }}?status=draft" class="text-decoration-none">
+                <div class="card text-center py-3 idx-stat-card">
+                    <div class="fs-2 fw-bold text-warning">{{ stats.draft_journals }}</div>
+                    <div class="small text-muted">Ноорог</div>
+                </div></a>
+            </div>
+            <div class="col-6">
+                <a href="{{ url_for('journals') }}" class="text-decoration-none">
+                <div class="card text-center py-3 idx-stat-card">
+                    <div class="fs-2 fw-bold" style="color:#7B1FA2">{{ stats.total_journals }}</div>
+                    <div class="small text-muted">Нийт гүйлгээ</div>
+                </div></a>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4">
+        <div class="card h-100">
+            <div class="card-header py-2"><i class="fas fa-tachometer-alt me-2"></i>Тайлангууд</div>
+            <div class="card-body p-0">
+                <div class="list-group list-group-flush">
+                    {% set links = [
+                      ('balance_sheet', 'fa-balance-scale', 'text-primary', 'Баланс тайлан', 'Хөрөнгө = Өр + Өмч'),
+                      ('income_statement', 'fa-chart-line', 'text-success', 'Орлого Зарлагын тайлан', 'Ашиг / Алдагдал'),
+                      ('cashflow_report', 'fa-water', 'text-info', 'Мөнгөн гүйлгээний тайлан', 'Дотоод нэгтгэл'),
+                      ('ledger', 'fa-book', 'text-warning', 'Дансны хөдөлгөөн', 'Дебит / Кредит'),
+                      ('vat', 'fa-receipt', 'text-orange', 'НӨАТ бүртгэл', 'eBarimt нэгтгэл'),
+                    ] %}
+                    {% for ep, icon, col, label, sub in links %}
+                    <a href="{{ url_for(ep) }}" class="list-group-item list-group-item-action d-flex align-items-center py-2 px-3">
+                        <i class="fas {{ icon }} {{ col }} me-3" style="width:16px; {% if col == 'text-orange' %}color:#F57C00{% endif %}"></i>
+                        <div>
+                            <div class="fw-semibold small">{{ label }}</div>
+                            <div class="text-muted" style="font-size:.72rem;">{{ sub }}</div>
+                        </div>
+                        <i class="fas fa-chevron-right ms-auto text-muted" style="font-size:.7rem;"></i>
+                    </a>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4">
+        <div class="card h-100">
+            <div class="card-header py-2 d-flex justify-content-between align-items-center">
+                <span><i class="fas fa-history me-2"></i>Сүүлийн гүйлгээ</span>
+                <a href="{{ url_for('add_journal') }}" class="btn btn-sm btn-outline-primary no-print px-2 py-0">+</a>
+            </div>
+            <div class="card-body p-0">
+                {% for j in recent_journals %}
+                <a href="{{ url_for('view_journal', id=j.id) }}"
+                   class="d-flex align-items-center px-3 py-2 border-bottom text-decoration-none text-dark hover-bg">
+                    <div class="flex-grow-1" style="min-width:0;">
+                        <div class="small fw-semibold font-monospace">{{ j.number }}</div>
+                        <div class="text-muted" style="font-size:.72rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+                            {{ j.date.strftime('%Y-%m-%d') }} · {{ (j.description or '—')[:28] }}
+                        </div>
+                    </div>
+                    <div class="ms-2 text-end flex-shrink-0">
+                        <div class="num small fw-bold">{{ "{:,.0f}".format(j.lines|sum(attribute='amount')) }}₮</div>
+                        {% if j.status == 'posted' %}
+                        <span class="badge badge-posted" style="font-size:.6rem;">✓</span>
+                        {% else %}
+                        <span class="badge badge-draft" style="font-size:.6rem;">✎</span>
+                        {% endif %}
+                    </div>
+                </a>
+                {% else %}
+                <div class="text-center text-muted py-4 small">
+                    <i class="fas fa-inbox fa-2x d-block mb-2 opacity-25"></i>
+                    Гүйлгээ байхгүй
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<style>
+.dash-section-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 12px;
+    padding-bottom: 6px;
+    border-bottom: 2px solid #e9ecef;
+    font-weight: 700;
+    font-size: 0.82rem;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: #546e7a;
+}
+.hover-bg:hover { background: #f8f9fa; }
+</style>
+{% endblock %}

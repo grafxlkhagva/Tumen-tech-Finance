@@ -1,0 +1,254 @@
+{% extends "base.html" %}
+{% block title %}Үндсэн хөрөнгийн бүртгэл{% endblock %}
+{% block page_title %}Үндсэн хөрөнгийн бүртгэл{% endblock %}
+
+{% block topbar_actions %}
+<a href="{{ url_for('export_fixed_assets') }}" class="btn btn-outline-success btn-sm me-2 no-print">
+    <i class="fas fa-file-excel me-1"></i>Excel
+</a>
+<button onclick="window.print()" class="btn btn-outline-secondary btn-sm me-2 no-print">
+    <i class="fas fa-print me-1"></i>Хэвлэх
+</button>
+<a href="{{ url_for('add_fixed_asset') }}" class="btn btn-primary btn-sm no-print">
+    <i class="fas fa-plus me-1"></i>Шинэ хөрөнгө
+</a>
+{% endblock %}
+
+{% block content %}
+
+{# ── Stat cards ── #}
+<div class="row g-3 mb-3">
+  <div class="col-md-3">
+    <div class="stat-card bg-blue">
+      <i class="fas fa-cubes icon"></i>
+      <h6>Нийт хөрөнгийн тоо</h6>
+      <h2>{{ assets|length }}</h2>
+      <small style="opacity:.8">идэвхтэй</small>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="stat-card bg-purple">
+      <i class="fas fa-coins icon"></i>
+      <h6>Анхны өртөг</h6>
+      <h2 style="font-size:1.2rem" class="num">{{ "{:,.0f}".format(total_cost) }}₮</h2>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="stat-card bg-orange">
+      <i class="fas fa-chart-line icon"></i>
+      <h6>Хуримтлагдсан элэгдэл</h6>
+      <h2 style="font-size:1.2rem" class="num">{{ "{:,.0f}".format(total_depr) }}₮</h2>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="stat-card bg-green">
+      <i class="fas fa-balance-scale icon"></i>
+      <h6>Дансны үнэ (цэвэр)</h6>
+      <h2 style="font-size:1.2rem" class="num">{{ "{:,.0f}".format(total_book) }}₮</h2>
+    </div>
+  </div>
+</div>
+
+{# ── Шүүлт ── #}
+<div class="card mb-3 no-print">
+  <div class="card-body py-2">
+    <form method="get" class="row g-2 align-items-end">
+      <div class="col-md-3">
+        <label class="form-label small fw-semibold mb-1">Ангилал</label>
+        <select name="cat" class="form-select form-select-sm" onchange="this.form.submit()">
+          <option value="">Бүгд</option>
+          {% for c in categories %}
+          <option value="{{ c }}" {{ 'selected' if sel_cat == c else '' }}>{{ c }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-3">
+        <label class="form-label small fw-semibold mb-1">Төлөв</label>
+        <select name="status" class="form-select form-select-sm" onchange="this.form.submit()">
+          <option value="active"   {{ 'selected' if sel_status == 'active'   else '' }}>Идэвхтэй</option>
+          <option value=""         {{ 'selected' if not sel_status            else '' }}>Бүгд</option>
+          <option value="disposed" {{ 'selected' if sel_status == 'disposed' else '' }}>Хасагдсан</option>
+          <option value="sold"     {{ 'selected' if sel_status == 'sold'     else '' }}>Борлуулсан</option>
+        </select>
+      </div>
+      <div class="col-auto">
+        <a href="{{ url_for('fixed_assets') }}" class="btn btn-outline-secondary btn-sm">
+          <i class="fas fa-redo me-1"></i>Бүгд
+        </a>
+      </div>
+    </form>
+  </div>
+</div>
+
+{# ── Хүснэгт ── #}
+<div class="card">
+  <div class="card-body p-0">
+    <table class="table table-hover table-sm mb-0" style="font-size:0.82rem">
+      <thead class="table-dark">
+        <tr>
+          <th style="width:70px">Код</th>
+          <th>Нэр</th>
+          <th style="width:100px">Ангилал</th>
+          <th class="text-end" style="width:120px">Анхны өртөг</th>
+          <th class="text-end" style="width:120px">Хуримт. элэгдэл</th>
+          <th class="text-end" style="width:120px">Дансны үнэ</th>
+          <th style="width:90px">Элэгдэл %</th>
+          <th style="width:60px">Төлөв</th>
+          <th class="no-print" style="width:70px"></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for a in assets %}
+        <tr style="cursor:pointer" onclick="toggleFA('fa{{ loop.index }}')">
+          <td class="font-monospace text-muted">{{ a.code or '—' }}</td>
+          <td class="fw-semibold">{{ a.name }}</td>
+          <td><span class="badge bg-secondary" style="font-size:0.7rem">{{ a.category }}</span></td>
+          <td class="text-end num">{{ "{:,.0f}".format(a.purchase_amount) }}</td>
+          <td class="text-end num text-danger">{{ "{:,.0f}".format(a.accumulated_depreciation) }}</td>
+          <td class="text-end num fw-bold {{ 'text-success' if a.book_value > 0 else 'text-muted' }}">
+            {{ "{:,.0f}".format(a.book_value) }}
+          </td>
+          <td>
+            <div class="progress" style="height:6px;border-radius:3px;margin-top:5px">
+              <div class="progress-bar {{ 'bg-danger' if a.depreciation_pct >= 90 else 'bg-warning' if a.depreciation_pct >= 50 else 'bg-success' }}"
+                   style="width:{{ a.depreciation_pct }}%"></div>
+            </div>
+            <div class="text-muted text-center" style="font-size:0.7rem">{{ "{:.0f}".format(a.depreciation_pct) }}%</div>
+          </td>
+          <td>
+            {% if a.status == 'active' %}<span class="badge bg-success" style="font-size:0.68rem">Идэвхтэй</span>
+            {% elif a.status == 'disposed' %}<span class="badge bg-secondary" style="font-size:0.68rem">Хасагдсан</span>
+            {% else %}<span class="badge bg-warning text-dark" style="font-size:0.68rem">Борлуулсан</span>{% endif %}
+          </td>
+          <td class="no-print text-end">
+            <a href="{{ url_for('edit_fixed_asset', id=a.id) }}"
+               class="btn btn-outline-secondary btn-sm" style="padding:1px 6px;font-size:0.72rem"
+               onclick="event.stopPropagation()" title="Засах">
+              <i class="fas fa-pen"></i>
+            </a>
+          </td>
+        </tr>
+        {# ── Задаргаа мөр ── #}
+        <tr id="fa{{ loop.index }}" class="d-none" style="background:#f8f9ff">
+          <td colspan="9" class="px-4 py-3">
+            <div class="row g-3">
+              <div class="col-md-5">
+                <table class="table table-sm mb-0" style="font-size:0.8rem">
+                  <tr><td class="text-muted" style="width:50%">Авсан огноо</td>
+                      <td>{{ a.purchase_date.strftime('%Y-%m-%d') if a.purchase_date else '—' }}</td></tr>
+                  <tr><td class="text-muted">Ашиглалтын хугацаа</td>
+                      <td>{{ a.useful_life }} жил</td></tr>
+                  <tr><td class="text-muted">Үлдэгдэл үнэ</td>
+                      <td class="num">{{ "{:,.0f}".format(a.salvage_value) }}₮</td></tr>
+                  <tr><td class="text-muted">Жилийн элэгдэл</td>
+                      <td class="num text-warning">{{ "{:,.0f}".format(a.annual_depreciation) }}₮</td></tr>
+                  <tr><td class="text-muted">Сарын элэгдэл</td>
+                      <td class="num text-warning">{{ "{:,.0f}".format(a.monthly_depreciation) }}₮</td></tr>
+                  <tr><td class="text-muted">Байршил</td>
+                      <td>{{ a.location or '—' }}</td></tr>
+                  <tr><td class="text-muted">Хариуцагч</td>
+                      <td>{{ a.responsible_person or '—' }}</td></tr>
+                  {% if a.notes %}
+                  <tr><td class="text-muted">Тэмдэглэл</td>
+                      <td class="small text-muted">{{ a.notes }}</td></tr>
+                  {% endif %}
+                </table>
+              </div>
+              <div class="col-md-4">
+                <div class="small fw-semibold text-muted mb-2"><i class="fas fa-calendar-alt me-1"></i>Элэгдлийн хуваарь</div>
+                <table class="table table-sm mb-0" style="font-size:0.78rem">
+                  <thead style="background:#e8f0fe">
+                    <tr>
+                      <th>Жил</th>
+                      <th class="text-end">Элэгдэл</th>
+                      <th class="text-end">Хуримт.</th>
+                      <th class="text-end">Дансны үнэ</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {% set ns = namespace(cum=a.accumulated_depreciation, book=a.book_value) %}
+                    {% if a.purchase_date %}
+                    {% set start_year = a.purchase_date.year %}
+                    {% else %}
+                    {% set start_year = 2026 %}
+                    {% endif %}
+                    {% for y in range(start_year, start_year + a.useful_life + 1) %}
+                    {% if ns.book > 0 %}
+                    <tr>
+                      <td>{{ y }}</td>
+                      <td class="text-end num text-warning">{{ "{:,.0f}".format([a.annual_depreciation, ns.book]|min) }}</td>
+                      <td class="text-end num text-danger">{{ "{:,.0f}".format(ns.cum + [a.annual_depreciation, ns.book]|min) }}</td>
+                      <td class="text-end num">{{ "{:,.0f}".format([ns.book - a.annual_depreciation, 0]|max) }}</td>
+                    </tr>
+                    {% set ns.cum = ns.cum + a.annual_depreciation %}
+                    {% set ns.book = [ns.book - a.annual_depreciation, 0]|max %}
+                    {% endif %}
+                    {% endfor %}
+                  </tbody>
+                </table>
+              </div>
+              <div class="col-md-3 d-flex flex-column justify-content-start gap-2 no-print">
+                <a href="{{ url_for('edit_fixed_asset', id=a.id) }}" class="btn btn-outline-primary btn-sm">
+                  <i class="fas fa-pen me-1"></i>Засах
+                </a>
+                <a href="{{ url_for('view_fixed_asset', id=a.id) }}" class="btn btn-outline-secondary btn-sm">
+                  <i class="fas fa-eye me-1"></i>Дэлгэрэнгүй
+                </a>
+                <form action="{{ url_for('depreciate_fixed_asset', id=a.id) }}" method="post"
+                      onsubmit="return confirm('Элэгдэл бичнэ үү?')">
+                  <input type="number" name="amount" class="form-control form-control-sm mb-1 num"
+                         value="{{ '{:.0f}'.format(a.monthly_depreciation) }}" placeholder="Дүн">
+                  <button class="btn btn-warning btn-sm w-100">
+                    <i class="fas fa-minus-circle me-1"></i>Элэгдэл бичих
+                  </button>
+                </form>
+              </div>
+            </div>
+          </td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="9" class="text-center py-5 text-muted">
+            <i class="fas fa-cubes fa-2x d-block mb-2 opacity-25"></i>
+            Үндсэн хөрөнгийн бүртгэл байхгүй байна
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+      {% if assets %}
+      <tfoot style="background:#e8f0fe" class="fw-bold">
+        <tr>
+          <td colspan="3" class="text-end text-muted small">Нийт {{ assets|length }} хөрөнгө:</td>
+          <td class="text-end num text-primary">{{ "{:,.0f}".format(total_cost) }}</td>
+          <td class="text-end num text-danger">{{ "{:,.0f}".format(total_depr) }}</td>
+          <td class="text-end num text-success">{{ "{:,.0f}".format(total_book) }}</td>
+          <td colspan="3"></td>
+        </tr>
+      </tfoot>
+      {% endif %}
+    </table>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+function toggleFA(id) {
+  const row = document.getElementById(id);
+  if (!row) return;
+  document.querySelectorAll('tr[id^="fa"]').forEach(r => {
+    if (r.id !== id) r.classList.add('d-none');
+  });
+  row.classList.toggle('d-none');
+}
+</script>
+<style>
+@media print {
+  .no-print { display: none !important; }
+  table { font-size: 7.5pt !important; }
+  thead.table-dark { background:#1a3c5e !important; color:#fff !important;
+    -webkit-print-color-adjust:exact; }
+}
+</style>
+{% endblock %}

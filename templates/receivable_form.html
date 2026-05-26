@@ -1,0 +1,200 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Нэхэмжлэх засах' if rec else 'Шинэ нэхэмжлэх' }}{% endblock %}
+{% block page_title %}{{ 'Нэхэмжлэх засах — ' ~ rec.invoice_no if rec else 'Шинэ нэхэмжлэх бүртгэх' }}{% endblock %}
+
+{% block topbar_actions %}
+<a href="{{ url_for('invoice_list') }}" class="btn btn-outline-secondary btn-sm">
+    <i class="fas fa-arrow-left me-1"></i>Буцах
+</a>
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+<div class="col-lg-7">
+
+<div class="card shadow-sm">
+  <div class="card-header {{ 'bg-warning text-dark' if rec else 'bg-primary text-white' }}">
+    <i class="fas fa-{{ 'edit' if rec else 'file-invoice' }} me-2"></i>
+    {{ 'Хариуцагч / тайлбар засах' if rec else 'Харилцагчид нэхэмжлэх гаргах' }}
+  </div>
+  <div class="card-body">
+    <form method="post" id="inv-form" {{ 'novalidate' if rec else '' }}>
+
+      {# ── Огноо + дугаар ── #}
+      <div class="row g-3 mb-3">
+        <div class="col-md-4">
+          <label class="form-label fw-semibold">Огноо</label>
+          <input type="date" name="date" id="inv-date" class="form-control"
+                 value="{{ rec.date.isoformat() if rec else now.date().isoformat() }}"
+                 {{ 'readonly style=background:#f8f9fa' if rec else 'required' }}>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label fw-semibold">Нэхэмжлэлийн №</label>
+          <input type="text" name="invoice_no" class="form-control font-monospace"
+                 value="{{ next_inv }}" placeholder="INV-2026-0001"
+                 {{ 'readonly style=background:#f8f9fa' if rec else '' }}>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label fw-semibold">Төлбөрийн хугацаа</label>
+          <input type="date" name="due_date" id="inv-due" class="form-control"
+                 value="{{ rec.due_date.isoformat() if rec and rec.due_date else '' }}">
+        </div>
+      </div>
+
+      {# ── Харилцагч ── #}
+      <div class="mb-3">
+        <label class="form-label fw-semibold">Харилцагч (байгууллага) *</label>
+        {% if rec %}
+        <input type="text" class="form-control" value="{{ rec.partner.name }}"
+               readonly style="background:#f8f9fa;font-weight:600">
+        <input type="hidden" name="partner_id" value="{{ rec.partner_id }}">
+        {% else %}
+        <select name="partner_id" id="inv-partner" class="form-select" required>
+          <option value="">— Харилцагч сонгоно уу —</option>
+          {% for p in partners %}
+          <option value="{{ p.id }}"
+                  data-reg="{{ p.register or '' }}"
+                  data-addr="{{ p.address or '' }}">{{ p.name }}</option>
+          {% endfor %}
+        </select>
+        <div class="mt-1 small text-muted" id="partner-info"></div>
+        {% endif %}
+      </div>
+
+      {# ── Хариуцагч (KAM) ── #}
+      <div class="mb-3">
+        <label class="form-label fw-semibold">
+          <i class="fas fa-user-tie me-1 text-primary"></i>Хариуцагч (KAM)
+        </label>
+        <select name="responsible" class="form-select">
+          <option value="">— Сонгоно уу —</option>
+          {% for e in kam_employees %}
+          <option value="{{ e.name }}"
+            {% if rec and rec.responsible == e.name %}selected{% endif %}>
+            {{ e.full_name }}{% if e.title %} — {{ e.title }}{% endif %}
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+
+      {# ── Тайлбар ── #}
+      <div class="mb-3">
+        <label class="form-label fw-semibold">Үйлчилгээний тайлбар</label>
+        <input type="text" name="description" class="form-control"
+               value="{{ rec.description if rec else '' }}"
+               placeholder="Тээврийн үйлчилгээ — 2026 оны … сар">
+      </div>
+
+      {% if rec %}
+      {# ── Засах горим: одоогийн дүн харуулна, өөрчлөхгүй ── #}
+      <div class="alert alert-secondary py-2 small mb-3">
+        <i class="fas fa-info-circle me-1"></i>
+        <strong>Нийт дүн:</strong> {{ "{:,.0f}".format(rec.amount) }}₮
+        &nbsp;|&nbsp; <strong>Төлөв:</strong>
+        {% if rec.status == 'paid' %}<span class="text-success">Төлөгдсөн</span>
+        {% elif rec.status == 'partial' %}<span class="text-warning">Хэсэгчлэн</span>
+        {% else %}<span class="text-danger">Нээлттэй</span>{% endif %}
+      </div>
+      {% else %}
+      {# ── Шинэ горим: дүн тооцоо ── #}
+      <div class="card bg-light mb-3">
+        <div class="card-body pb-2">
+          <div class="row g-3 align-items-end">
+            <div class="col-md-5">
+              <label class="form-label fw-semibold">НӨАТ-аас өмнөх дүн *</label>
+              <div class="input-group">
+                <input type="number" name="base_amount" id="base-amount"
+                       class="form-control text-end" min="0" step="1"
+                       placeholder="0" required oninput="calcVat()">
+                <span class="input-group-text">₮</span>
+              </div>
+            </div>
+            <div class="col-md-3">
+              <div class="form-check form-switch mt-2">
+                <input class="form-check-input" type="checkbox" name="has_vat"
+                       id="has-vat" value="1" checked onchange="calcVat()">
+                <label class="form-check-label fw-semibold" for="has-vat">НӨАТ 10%</label>
+              </div>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label text-muted">НӨАТ дүн</label>
+              <div class="form-control text-end bg-white num" id="vat-display" style="color:#0d6efd">0</div>
+            </div>
+          </div>
+          <div class="d-flex justify-content-between align-items-center mt-3 pt-2 border-top">
+            <span class="fw-bold fs-6">Нийт нэхэмжлэх дүн:</span>
+            <span class="fw-bold fs-5 text-success num" id="total-display">0 ₮</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="alert alert-info py-2 small mb-3">
+        <i class="fas fa-book me-1"></i>
+        <strong>Журналын бичилт:</strong>
+        <span id="jl-text">ДТ 1210 Авлага / КТ 6110 Орлого + КТ 3152 НӨАТ</span>
+      </div>
+      {% endif %}
+
+      <div class="d-flex gap-2">
+        <button type="submit" class="btn btn-primary px-4">
+          <i class="fas fa-save me-1"></i>
+          {{ 'Хадгалах' if rec else 'Хадгалах &amp; Т-1 хэвлэх' }}
+        </button>
+        <a href="{{ url_for('invoice_list') }}" class="btn btn-outline-secondary">Болих</a>
+      </div>
+
+    </form>
+  </div>
+</div>
+
+</div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+{% if not rec %}
+function fmt(n) {
+  return new Intl.NumberFormat('mn-MN').format(Math.round(n));
+}
+
+function calcVat() {
+  const base   = parseFloat(document.getElementById('base-amount').value) || 0;
+  const hasVat = document.getElementById('has-vat').checked;
+  const vat    = hasVat ? Math.round(base * 0.1) : 0;
+  const total  = base + vat;
+  document.getElementById('vat-display').textContent   = fmt(vat);
+  document.getElementById('total-display').textContent = fmt(total) + ' ₮';
+  const jl = hasVat
+    ? 'ДТ 1210 Авлага / КТ 6110 Орлого (' + fmt(base) + '₮) + КТ 3152 НӨАТ (' + fmt(vat) + '₮)'
+    : 'ДТ 1210 Авлага / КТ 6110 Орлого (' + fmt(base) + '₮)';
+  document.getElementById('jl-text').textContent = jl;
+}
+
+// Харилцагч сонгоход рег/хаяг харуулна
+const partnerSel = document.getElementById('inv-partner');
+if (partnerSel) {
+  partnerSel.addEventListener('change', function() {
+    const opt  = this.options[this.selectedIndex];
+    const reg  = opt.dataset.reg  || '';
+    const addr = opt.dataset.addr || '';
+    document.getElementById('partner-info').textContent =
+      (reg ? 'Рег: ' + reg : '') + (reg && addr ? '  ·  ' : '') + (addr || '');
+  });
+}
+
+// Огноо + 30 хоног → хугацаа автомат
+const dateEl = document.getElementById('inv-date');
+if (dateEl) {
+  dateEl.addEventListener('change', function() {
+    const d = new Date(this.value);
+    d.setDate(d.getDate() + 30);
+    document.getElementById('inv-due').value = d.toISOString().slice(0, 10);
+  });
+  dateEl.dispatchEvent(new Event('change'));
+}
+
+calcVat();
+{% endif %}
+</script>
+{% endblock %}

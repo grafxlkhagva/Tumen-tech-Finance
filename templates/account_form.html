@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Данс засах' if account else 'Данс нэмэх' }}{% endblock %}
+{% block page_title %}{{ 'Данс засах' if account else 'Данс нэмэх' }}{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+<div class="col-md-7">
+<div class="card">
+    <div class="card-header">
+        <i class="fas fa-sitemap me-2"></i>{{ 'Данс засах' if account else 'Шинэ данс нэмэх' }}
+    </div>
+    <div class="card-body">
+        <form method="post">
+            <div class="mb-3">
+                <label class="form-label fw-semibold">Дансны код <span class="text-danger">*</span></label>
+                <input type="text" name="code" class="form-control" placeholder="1010"
+                       value="{{ account.code if account else '' }}" required>
+                <div class="form-text">Жишээ: 1010, 2020, 4000</div>
+            </div>
+            <div class="mb-3">
+                <label class="form-label fw-semibold">Дансны нэр <span class="text-danger">*</span></label>
+                <input type="text" name="name" class="form-control" placeholder="Касс"
+                       value="{{ account.name if account else '' }}" required>
+            </div>
+            <div class="mb-3">
+                <label class="form-label fw-semibold">Дансны төрөл <span class="text-danger">*</span></label>
+                <select name="type" class="form-select" required>
+                    <option value="">— Сонгоно уу —</option>
+                    {% for val, label in [('asset','Хөрөнгө'), ('liability','Өр төлбөр'), ('equity','Өмч'), ('income','Орлого'), ('expense','Зардал')] %}
+                    <option value="{{ val }}" {{ 'selected' if account and account.type == val else '' }}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="mb-4">
+                <label class="form-label fw-semibold">Эх данс</label>
+                <select name="parent_id" class="form-select">
+                    <option value="">— Эх данс байхгүй —</option>
+                    {% for p in parent_accounts %}
+                    <option value="{{ p.id }}" {{ 'selected' if account and account.parent_id == p.id else '' }}>
+                        {{ p.code }} — {{ p.name }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="d-flex gap-2">
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-save me-1"></i>{{ 'Хадгалах' }}
+                </button>
+                <a href="{{ url_for('accounts') }}" class="btn btn-outline-secondary">Буцах</a>
+            </div>
+        </form>
+    </div>
+</div>
+</div>
+</div>
+{% endblock %}

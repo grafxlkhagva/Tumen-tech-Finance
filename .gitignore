@@ -1,0 +1,46 @@
+# macOS
+.DS_Store
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+.venv/
+venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs
+*.log
+
+# Environment / secrets
+.env
+.env.local
+.env.*.local
+.env.prod
+!.env.example
+
+# Supabase
+supabase/.branches/
+supabase/.temp/
+
+# Node / Frontend (ирээдүйд)
+node_modules/
+.next/
+dist/
+build/
+
+# Database backups
+*.db.backup
+*.dump
+*.sql.gz
+
+# OS
+Thumbs.db

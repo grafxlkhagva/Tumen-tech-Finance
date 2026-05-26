@@ -1,0 +1,391 @@
+ * Serving Flask app 'app'
+ * Debug mode: on
+WARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:5000
+ * Running on http://192.168.0.204:5000
+Press CTRL+C to quit
+ * Restarting with watchdog (windowsapi)
+ * Debugger is active!
+ * Debugger PIN: 427-148-354
+ * Detected change in 'C:\\Users\\natsa\\Desktop\\SmartAccounting2\\import_ebarimt.py', reloading
+ * Restarting with watchdog (windowsapi)
+ * Debugger is active!
+ * Debugger PIN: 427-148-354
+ * Detected change in 'C:\\Users\\natsa\\Desktop\\SmartAccounting2\\import_ebarimt.py', reloading
+ * Restarting with watchdog (windowsapi)
+ * Debugger is active!
+ * Debugger PIN: 427-148-354
+ * Detected change in 'C:\\Users\\natsa\\Desktop\\SmartAccounting2\\import_ebarimt.py', reloading
+ * Restarting with watchdog (windowsapi)
+ * Debugger is active!
+ * Debugger PIN: 427-148-354
+ * Detected change in 'C:\\Users\\natsa\\Desktop\\SmartAccounting2\\import_ebarimt.py', reloading
+ * Restarting with watchdog (windowsapi)
+ * Debugger is active!
+ * Debugger PIN: 427-148-354
+ * Detected change in 'C:\\Users\\natsa\\Desktop\\SmartAccounting2\\import_ebarimt.py', reloading
+ * Restarting with watchdog (windowsapi)
+ * Debugger is active!
+ * Debugger PIN: 427-148-354
+ * Detected change in 'C:\\Users\\natsa\\Desktop\\SmartAccounting2\\import_ebarimt.py', reloading
+ * Restarting with watchdog (windowsapi)
+ * Debugger is active!
+ * Debugger PIN: 427-148-354
+ * Detected change in 'C:\\Users\\natsa\\Desktop\\SmartAccounting2\\import_ebarimt.py', reloading
+ * Restarting with watchdog (windowsapi)
+ * Debugger is active!
+ * Debugger PIN: 427-148-354
+ * Detected change in 'C:\\Users\\natsa\\Desktop\\SmartAccounting2\\app.py', reloading
+ * Restarting with watchdog (windowsapi)
+ * Debugger is active!
+ * Debugger PIN: 427-148-354
+ * Detected change in 'C:\\Users\\natsa\\Desktop\\SmartAccounting2\\app.py', reloading
+ * Restarting with watchdog (windowsapi)
+Traceback (most recent call last):
+  File "C:\Users\natsa\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\sqlalchemy\engine\base.py", line 1967, in _exec_single_context
+    self.dialect.do_execute(
+    ~~~~~~~~~~~~~~~~~~~~~~~^
+        cursor, str_statement, effective_parameters, context
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\natsa\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\sqlalchemy\engine\default.py", line 952, in do_execute
+    cursor.execute(statement, parameters)
+    ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+sqlite3.OperationalError: no such column: employees.phone
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\Users\natsa\Desktop\SmartAccounting2\app.py", line 4366, in <module>
+    seed_employees()
+    ~~~~~~~~~~~~~~^^
+  File "C:\Users\natsa\Desktop\SmartAccounting2\app.py", line 541, in seed_employees
+    if Employee.query.filter_by(company='\u0422\u04ae\u041c\u042d\u041d \u0422\u042d\u042d\u0425 \u0425\u0425\u041a').count() > 0:
+       ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\natsa\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\sqlalchemy\orm\query.py", line 3153, in count
+    self._legacy_from_self(col).enable_eagerloads(False).scalar()
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\natsa\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\sqlalchemy\orm\query.py", line 2842, in scalar
+    ret = self.one()
+  File "C:\Users\natsa\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\sqlalchemy\orm\query.py", line 2815, in one
+    return self._iter().one()  # type: ignore
+           ~~~~~~~~~~^^
+  File "C:\Users\natsa\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\sqlalchemy\orm\query.py", line 2864, in _iter
+    result: Un  File "C:\Users\natsa\Desktop\SmartAccounting2\app.py", line 4366, in <module>
+    seed_employees()
+    ~~~~~~~~~~~~~~^^
+  File "C:\Users\natsa\Desktop\SmartAccounting2\app.py", line 541, in seed_employees
+    if Employee.query.filter_by(company='\u0422\u04ae\u041c\u042d\u041d \u0422\u042d\u042d\u0425 \u0425\u0425\u041a').count() > 0:
+       ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\natsa\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\sqlalchemy\orm\query.py", line 3153, in count
+    self._legacy_from_self(col).enable_eagerloads(False).scalar()
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\natsa\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\sqlalchemy\orm\query.py", line 2842, in scalar
+    ret = self.one()
+  File "C:\Users\natsa\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\sqlalchemy\orm\query.py", line 2815, in one
+    return self._iter().one()  # type: ignore
+           ~~~~~~~~~~^^
+  File "C:\Users\natsa\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\sqlalchemy\orm\query.py", line 2864, in _iter
+    result: Union[ScalarResult[_T], Result[_T]] = self.session.execute(
+                                                  ~~~~~~~~~~~~~~~~~~~~^
+        statement,
+        ^^^^^^^^^^
+        params,
+        ^^^^^^^
+        execution_options={"_sa_orm_load_options": self.load_options},
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\natsa\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\sqlalchemy\orm\session.py", line 2351, in execute
+    return self._execute_internal(
+           ~~~~~~~~~~~~~~~~~~~~~~^
+        statement,
+        ^^^^^^^^^^
+    ...<4 lines>...
+        _add_event=_add_event,
+        ^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\natsa\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\sqlalchemy\orm\session.py", line 2249, in _execute_internal
+    result: Result[Any] = compile_state_cls.orm_execute_statement(
+                          ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        self,
+        ^^^^^
+    ...<4 lines>...
+        conn,
+        ^^^^^
+    )
+    ^
+  File "C:\Users\natsa\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\sqlalchemy\orm\context.py", line 306, in orm_execute_statement
+    result = conn.execute(
+        statement, params or {}, execution_options=execution_options
+    )
+  File "C:\Users\natsa\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\sqlalchemy\engine\base.py", line 1419, in execute
+    return meth(
+        self,
+        distilled_parameters,
+        execution_options or NO_OPTIONS,
+    )
+  File "C:\Users\natsa\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\sqlalchemy\sql\elements.py", line 527, in _execute_on_connection
+    return connection._execute_clauseelement(
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        self, distilled_params, execution_options
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\natsa\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\sqlalchemy\engine\base.py", line 1641, in _execute_clauseelement
+    ret = self._execute_context(
+        dialect,
+    ...<8 lines>...
+        cache_hit=cache_hit,
+    )
+  File "C:\Users\natsa\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\sqlalchemy\engine\base.py", line 1846, in _execute_context
+    return self._exec_single_context(
+           ~~~~~~~~~~~~~~~~~~~~~~~~~^
+        dialect, context, statement, parameters
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\natsa\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\sqlalchemy\engine\base.py", line 1986, in _exec_single_context
+    self._handle_dbapi_exception(
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        e, str_statement, effective_parameters, cursor, context
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\natsa\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\sqlalchemy\engine\base.py", line 2363, in _handle_dbapi_exception
+    raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
+  File "C:\Users\natsa\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\sqlalchemy\engine\base.py", line 1967, in _exec_single_context
+    self.dialect.do_execute(
+    ~~~~~~~~~~~~~~~~~~~~~~~^
+        cursor, str_statement, effective_parameters, context
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\natsa\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\sqlalchemy\engine\default.py", line 952, in do_execute
+    cursor.execute(statement, parameters)
+    ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+sqlalchemy.exc.OperationalError: (sqlite3.OperationalError) no such column: employees.phone
+[SQL: SELECT count(*) AS count_1 
+FROM (SELECT employees.id AS employees_id, employees.name AS employees_name, employees.lastname AS employees_lastname, employees.tin AS employees_tin, employees.company AS employees_company, employees.title AS employees_title, employees.base_salary AS employees_base_salary, employees.adv_base AS employees_adv_base, employees.phone AS employees_phone, employees.phone_allowance AS employees_phone_allowance, employees.hire_date AS employees_hire_date, employees.exp_years AS employees_exp_years, employees.bank AS employees_bank, employees.account AS employees_account, employees.email AS employees_email, employees.color AS employees_color, employees.is_active AS employees_is_active, employees.partner_id AS employees_partner_id 
+FROM employees 
+WHERE employees.company = ?) AS anon_1]
+[parameters: ('\u0422\u04ae\u041c\u042d\u041d \u0422\u042d\u042d\u0425 \u0425\u0425\u041a',)]
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+13:30:01] "GET /static/logo.png HTTP/1.1" 304 -
+127.0.0.1 - - [26/May/2026 13:30:05] "GET /partners/352 HTTP/1.1" 200 -
+127.0.0.1 - - [26/May/2026 13:30:05] "GET /static/logo.png HTTP/1.1" 304 -
+127.0.0.1 - - [26/May/2026 13:30:12] "GET /partners/352/reconcile-act?date_from=&date_to= HTTP/1.1" 200 -
+127.0.0.1 - - [26/May/2026 13:30:13] "GET /static/img/stamp_tumen_teekh.png HTTP/1.1" 304 -
+127.0.0.1 - - [26/May/2026 13:30:13] "GET /static/img/signature_accountant.png HTTP/1.1" 304 -
+127.0.0.1 - - [26/May/2026 13:32:40] "GET /invoices HTTP/1.1" 200 -
+127.0.0.1 - - [26/May/2026 13:32:40] "GET /static/logo.png HTTP/1.1" 304 -
+127.0.0.1 - - [26/May/2026 13:32:46] "GET /receivables HTTP/1.1" 200 -
+127.0.0.1 - - [26/May/2026 13:32:46] "GET /static/logo.png HTTP/1.1" 304 -
+127.0.0.1 - - [26/May/2026 13:32:50] "GET /partners/372 HTTP/1.1" 200 -
+127.0.0.1 - - [26/May/2026 13:32:50] "GET /static/logo.png HTTP/1.1" 304 -
+127.0.0.1 - - [26/May/2026 13:32:56] "GET /partners/372/reconcile-act?date_from=&date_to= HTTP/1.1" 200 -
+127.0.0.1 - - [26/May/2026 13:32:56] "GET /static/img/stamp_tumen_teekh.png HTTP/1.1" 304 -
+127.0.0.1 - - [26/May/2026 13:32:56] "GET /static/img/signature_accountant.png HTTP/1.1" 304 -
+127.0.0.1 - - [26/May/2026 13:53:42] "GET /partners/372/reconcile-act?date_from=&date_to= HTTP/1.1" 200 -
+127.0.0.1 - - [26/May/2026 13:53:42] "GET /static/img/stamp_tumen_teekh.png HTTP/1.1" 304 -
+127.0.0.1 - - [26/May/2026 13:53:42] "GET /static/img/signature_accountant.png HTTP/1.1" 304 -
+127.0.0.1 - - [26/May/2026 13:54:30] "GET /partners/372/reconcile-act?date_from=&date_to= HTTP/1.1" 200 -
+127.0.0.1 - - [26/May/2026 13:54:30] "GET /static/img/stamp_tumen_teekh.png HTTP/1.1" 304 -
+127.0.0.1 - - [26/May/2026 13:54:30] "GET /static/img/signature_accountant.png HTTP/1.1" 304 -
+127.0.0.1 - - [26/May/2026 13:55:34] "GET /partners/372 HTTP/1.1" 200 -
+127.0.0.1 - - [26/May/2026 13:55:34] "GET /static/logo.png HTTP/1.1" 304 -
+127.0.0.1 - - [26/May/2026 13:55:37] "GET /partners/372 HTTP/1.1" 200 -
+127.0.0.1 - - [26/May/2026 13:55:37] "GET /static/logo.png HTTP/1.1" 304 -
+ * Detected change in 'C:\\Users\\natsa\\Desktop\\SmartAccounting2\\import_ebarimt.py', reloading
+ * Restarting with watchdog (windowsapi)
+ * Debugger is active!
+ * Debugger PIN: 427-148-354
+ * Detected change in 'C:\\Users\\natsa\\Desktop\\SmartAccounting2\\import_ebarimt.py', reloading
+ * Restarting with watchdog (windowsapi)
+ * Debugger is active!
+ * Debugger PIN: 427-148-354
+ * Detected change in 'C:\\Users\\natsa\\Desktop\\SmartAccounting2\\import_ebarimt.py', reloading
+ * Detected change in 'C:\\Users\\natsa\\Desktop\\SmartAccounting2\\import_ebarimt.py.tmp.33568.fe02919dee3b', reloading
+ * Restarting with watchdog (windowsapi)
+ * Debugger is active!
+ * Debugger PIN: 427-148-354
+127.0.0.1 - - [26/May/2026 14:08:29] "GET /partners/53 HTTP/1.1" 200 -
+127.0.0.1 - - [26/May/2026 14:08:29] "GET /static/logo.png HTTP/1.1" 304 -
+127.0.0.1 - - [26/May/2026 14:08:30] "GET /favicon.ico HTTP/1.1" 404 -
+ * Detected change in 'C:\\Users\\natsa\\Desktop\\SmartAccounting2\\import_ebarimt.py', reloading
+ * Restarting with watchdog (windowsapi)
+ * Debugger is active!
+ * Debugger PIN: 427-148-354
+127.0.0.1 - - [26/May/2026 14:09:00] "GET /partners/53?date_from=&date_to= HTTP/1.1" 200 -
+127.0.0.1 - - [26/May/2026 14:09:01] "GET /static/logo.png HTTP/1.1" 304 -
+ * Detected change in 'C:\\Users\\natsa\\Desktop\\SmartAccounting2\\import_ebarimt.py', reloading
+ * Restarting with watchdog (windowsapi)
+ * Debugger is active!
+ * Debugger PIN: 427-148-354
+ * Detected change in 'C:\\Users\\natsa\\Desktop\\SmartAccounting2\\import_ebarimt.py', reloading
+ * Restarting with watchdog (windowsapi)
+ * Debugger is active!
+ * Debugger PIN: 427-148-354
+ * Detected change in 'C:\\Users\\natsa\\Desktop\\SmartAccounting2\\import_ebarimt.py', reloading
+ * Restarting with watchdog (windowsapi)
+ * Debugger is active!
+ * Debugger PIN: 427-148-354
+127.0.0.1 - - [26/May/2026 14:28:34] "GET /partners/372 HTTP/1.1" 200 -
+127.0.0.1 - - [26/May/2026 14:28:35] "GET /static/logo.png HTTP/1.1" 304 -
+127.0.0.1 - - [26/May/2026 14:29:19] "GET /partners HTTP/1.1" 200 -
+127.0.0.1 - - [26/May/2026 14:29:19] "GET /static/logo.png HTTP/1.1" 304 -
+127.0.0.1 - - [26/May/2026 14:29:34] "GET /partners/287 HTTP/1.1" 200 -
+127.0.0.1 - - [26/May/2026 14:29:34] "GET /static/logo.png HTTP/1.1" 304 -
+127.0.0.1 - - [26/May/2026 14:29:57] "GET /partners HTTP/1.1" 200 -
+127.0.0.1 - - [26/May/2026 14:29:57] "GET /static/logo.png HTTP/1.1" 304 -
+127.0.0.1 - - [26/May/2026 14:30:00] "GET /receivables HTTP/1.1" 200 -
+127.0.0.1 - - [26/May/2026 14:30:00] "GET /static/logo.png HTTP/1.1" 304 -
+127.0.0.1 - - [26/May/2026 14:30:04] "GET /partners HTTP/1.1" 200 -
+127.0.0.1 - - [26/May/2026 14:30:04] "GET /static/logo.png HTTP/1.1" 304 -
+127.0.0.1 - - [26/May/2026 14:30:14] "GET /api/partners/suggest?q=\u04e9 HTTP/1.1" 200 -
+127.0.0.1 - - [26/May/2026 14:30:15] "GET /api/partners/suggest?q=\u043c HTTP/1.1" 200 -
+127.0.0.1 - - [26/May/2026 14:30:17] "GET /api/partners/suggest?q=\u043c HTTP/1.1" 200 -
+127.0.0.1 - - [26/May/2026 14:30:18] "GET /api/partners/suggest?q=\u043c%20\u0441 HTTP/1.1" 200 -
+127.0.0.1 - - [26/May/2026 14:30:20] "GET /partners?type=&q=\u041c+\u0421\u0418+\u042d\u0421+\u0418\u041d\u0422\u0415\u0420\u041d\u042d\u0419\u0428\u041d\u041b+\u0425\u0425\u041a HTTP/1.1" 200 -
+127.0.0.1 - - [26/May/2026 14:30:20] "GET /static/logo.png HTTP/1.1" 304 -
+127.0.0.1 - - [26/May/2026 14:30:25] "GET /partners/53 HTTP/1.1" 200 -
+127.0.0.1 - - [26/May/2026 14:30:25] "GET /static/logo.png HTTP/1.1" 304 -
+C:\Users\natsa\Desktop\SmartAccounting2\app.py:4294: LegacyAPIWarning: The Query.get() method is considered legacy as of the 1.x series of SQLAlchemy and becomes a legacy construct in 2.0. The method is now available as Session.get() (deprecated since: 2.0) (Background on SQLAlchemy 2.0 at: https://sqlalche.me/e/b8d9)
+  rec     = Receivable.query.get(rec_id) if rec_id else None
+ * Detected change in 'C:\\Users\\natsa\\Desktop\\SmartAccounting2\\app.py', reloading
+ * Restarting with watchdog (windowsapi)
+ * Debugger is active!
+ * Debugger PIN: 427-148-354
+C:\Users\natsa\Desktop\SmartAccounting2\app.py:4294: LegacyAPIWarning: The Query.get() method is considered legacy as of the 1.x series of SQLAlchemy and becomes a legacy construct in 2.0. The method is now available as Session.get() (deprecated since: 2.0) (Background on SQLAlchemy 2.0 at: https://sqlalche.me/e/b8d9)
+  rec     = Receivable.query.get(rec_id) if rec_id else None
+127.0.0.1 - - [26/May/2026 14:30:47] "GET /forms/t1?rec=154 HTTP/1.1" 200 -
+127.0.0.1 - - [26/May/2026 14:30:47] "GET /static/logo.png HTTP/1.1" 304 -
+127.0.0.1 - - [26/May/2026 14:30:47] "GET /static/tumen_stamp.png HTTP/1.1" 304 -
+127.0.0.1 - - [26/May/2026 14:39:13] "GET /invoices HTTP/1.1" 200 -
+127.0.0.1 - - [26/May/2026 14:39:13] "GET /static/logo.png HTTP/1.1" 304 -
+127.0.0.1 - - [26/May/2026 14:39:22] "GET /invoices/348/print HTTP/1.1" 200 -
+127.0.0.1 - - [26/May/2026 14:39:23] "GET /static/tumen_stamp.png HTTP/1.1" 304 -
+127.0.0.1 - - [26/May/2026 14:41:38] "GET /invoices/350/print HTTP/1.1" 200 -
+127.0.0.1 - - [26/May/2026 14:41:38] "GET /static/tumen_stamp.png HTTP/1.1" 304 -
+ * Detected change in 'C:\\Users\\natsa\\Desktop\\SmartAccounting2\\app.py', reloading
+ * Restarting with watchdog (windowsapi)
+Traceback (most recent call last):
+  File "C:\Users\natsa\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\sqlalchemy\engine\base.py", line 1967, in _exec_single_context
+    self.dialect.do_execute(
+    ~~~~~~~~~~~~~~~~~~~~~~~^
+        cursor, str_statement, effective_parameters, context
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\natsa\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\sqlalchemy\engine\default.py", line 952, in do_execute
+    cursor.execute(statement, parameters)
+    ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+sqlite3.OperationalError: no such column: employees.phone
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\Users\natsa\Desktop\SmartAccounting2\app.py", line 4366, in <module>
+    seed_employees()
+    ~~~~~~~~~~~~~~^^
+  File "C:\Users\natsa\Desktop\SmartAccounting2\app.py", line 541, in seed_employees
+    if Employee.query.filter_by(company='\u0422\u04ae\u041c\u042d\u041d \u0422\u042d\u042d\u0425 \u0425\u0425\u041a').count() > 0:
+       ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\natsa\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\sqlalchemy\orm\query.py", line 3153, in count
+    self._legacy_from_self(col).enable_eagerloads(False).scalar()
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\natsa\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\sqlalchemy\orm\query.py", line 2842, in scalar
+    ret = self.one()
+  File "C:\Users\natsa\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\sqlalchemy\orm\query.py", line 2815, in one
+    return self._iter().one()  # type: ignore
+           ~~~~~~~~~~^^
+  File "C:\Users\natsa\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\sqlalchemy\orm\query.py", line 2864, in _iter
+    result: Union[ScalarResult[_T], Result[_T]] = self.session.execute(
+                                                  ~~~~~~~~~~~~~~~~~~~~^
+        statement,
+        ^^^^^^^^^^
+        params,
+        ^^^^^^^
+        execution_options={"_sa_orm_load_options": self.load_options},
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\natsa\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\sqlalchemy\orm\session.py", line 2351, in execute
+    return self._execute_internal(
+           ~~~~~~~~~~~~~~~~~~~~~~^
+        statement,
+        ^^^^^^^^^^
+    ...<4 lines>...
+        _add_event=_add_event,
+        ^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\natsa\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\sqlalchemy\orm\session.py", line 2249, in _execute_internal
+    result: Result[Any] = compile_state_cls.orm_execute_statement(
+                          ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        self,
+        ^^^^^
+    ...<4 lines>...
+        conn,
+        ^^^^^
+    )
+    ^
+  File "C:\Users\natsa\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\sqlalchemy\orm\context.py", line 306, in orm_execute_statement
+    result = conn.execute(
+        statement, params or {}, execution_options=execution_options
+    )
+  File "C:\Users\natsa\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\sqlalchemy\engine\base.py", line 1419, in execute
+    return meth(
+        self,
+        distilled_parameters,
+        execution_options or NO_OPTIONS,
+    )
+  File "C:\Users\natsa\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\sqlalchemy\sql\elements.py", line 527, in _execute_on_connection
+    return connection._execute_clauseelement(
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        self, distilled_params, execution_options
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\natsa\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\sqlalchemy\engine\base.py", line 1641, in _execute_clauseelement
+    ret = self._execute_context(
+        dialect,
+    ...<8 lines>...
+        cache_hit=cache_hit,
+    )
+  File "C:\Users\natsa\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\sqlalchemy\engine\base.py", line 1846, in _execute_context
+    return self._exec_single_context(
+           ~~~~~~~~~~~~~~~~~~~~~~~~~^
+        dialect, context, statement, parameters
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\natsa\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\sqlalchemy\engine\base.py", line 1986, in _exec_single_context
+    self._handle_dbapi_exception(
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        e, str_statement, effective_parameters, cursor, context
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\natsa\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\sqlalchemy\engine\base.py", line 2363, in _handle_dbapi_exception
+    raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
+  File "C:\Users\natsa\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\sqlalchemy\engine\base.py", line 1967, in _exec_single_context
+    self.dialect.do_execute(
+    ~~~~~~~~~~~~~~~~~~~~~~~^
+        cursor, str_statement, effective_parameters, context
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\natsa\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\sqlalchemy\engine\default.py", line 952, in do_execute
+    cursor.execute(statement, parameters)
+    ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+sqlalchemy.exc.OperationalError: (sqlite3.OperationalError) no such column: employees.phone
+[SQL: SELECT count(*) AS count_1 
+FROM (SELECT employees.id AS employees_id, employees.name AS employees_name, employees.lastname AS employees_lastname, employees.tin AS employees_tin, employees.company AS employees_company, employees.title AS employees_title, employees.base_salary AS employees_base_salary, employees.adv_base AS employees_adv_base, employees.phone AS employees_phone, employees.phone_allowance AS employees_phone_allowance, employees.hire_date AS employees_hire_date, employees.exp_years AS employees_exp_years, employees.bank AS employees_bank, employees.account AS employees_account, employees.email AS employees_email, employees.color AS employees_color, employees.is_active AS employees_is_active, employees.partner_id AS employees_partner_id 
+FROM employees 
+WHERE employees.company = ?) AS anon_1]
+[parameters: ('\u0422\u04ae\u041c\u042d\u041d \u0422\u042d\u042d\u0425 \u0425\u0425\u041a',)]
+(Background on this error at: https://sqlalche.me/e/20/e3q8)

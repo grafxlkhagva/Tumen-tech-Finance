@@ -1,0 +1,184 @@
+{% extends "base.html" %}
+{% block title %}Т-2 Мөнгөн урьдчилгааны тайлан{% endblock %}
+{% block page_title %}Т-2 — Мөнгөн урьдчилгааны тайлан{% endblock %}
+
+{% block topbar_actions %}
+<button onclick="window.print()" class="btn btn-warning btn-sm no-print">
+    <i class="fas fa-print me-1"></i>Хэвлэх
+</button>
+<a href="{{ url_for('forms') }}" class="btn btn-outline-secondary btn-sm ms-2 no-print">
+    <i class="fas fa-arrow-left me-1"></i>Буцах
+</a>
+{% endblock %}
+
+{% block content %}
+<div class="no-print mb-3">
+  <div class="alert alert-info py-2 small">
+    <i class="fas fa-info-circle me-1"></i>
+    Та маягтын талбарт дарж мэдээлэл оруулж болно. <strong>Хэвлэх</strong> дарна уу.
+  </div>
+</div>
+
+<div class="form-doc-wrap">
+<div class="form-doc-page">
+
+  <div class="form-ref-top">
+    <span>НХМаягт Т-2</span>
+    <span class="form-ref-right">Сангийн сайдын 2017 оны<br>347 дугаар тушаалын хавсралт</span>
+  </div>
+
+  <h2 class="form-title">
+    МӨНГӨН УРЬДЧИЛГААНЫ ТАЙЛАН №
+    <span contenteditable="true" class="form-fill underline-fill" style="min-width:80px">{{ num }}</span>
+  </h2>
+
+  <div class="form-row-line">
+    <span>Байгууллагын нэр:</span>
+    <span contenteditable="true" class="form-fill underline-fill flex-fill">{{ company.name }}</span>
+    <span style="margin-left:16px">20</span>
+    <span contenteditable="true" class="form-fill underline-fill" style="min-width:20px"></span>
+    <span>оны</span>
+    <span contenteditable="true" class="form-fill underline-fill" style="min-width:30px"></span>
+    <span>сарын</span>
+    <span contenteditable="true" class="form-fill underline-fill" style="min-width:30px"></span>
+    <span>өдөр</span>
+  </div>
+
+  <div class="form-row-line mt-1">
+    <span>Регистр:</span>
+    <span contenteditable="true" class="form-fill underline-fill" style="min-width:90px">{{ company.register }}</span>
+    <span style="margin-left:16px">ХРГ:</span>
+    <span contenteditable="true" class="form-fill underline-fill" style="min-width:120px">{{ company.tax_id }}</span>
+    <span style="margin-left:16px">Утас:</span>
+    <span contenteditable="true" class="form-fill underline-fill" style="min-width:90px">{{ company.phone }}</span>
+  </div>
+
+  <div class="form-row-line mt-2">
+    <span>Урьдчилгаа авагч овог нэр:</span>
+    <span contenteditable="true" class="form-fill underline-fill flex-fill"></span>
+  </div>
+  <div class="form-row-line mt-1">
+    <span>Албан тушаал:</span>
+    <span contenteditable="true" class="form-fill underline-fill flex-fill"></span>
+  </div>
+
+  <table class="t2-table mt-3">
+    <thead>
+      <tr>
+        <th rowspan="2" style="width:36px">№</th>
+        <th rowspan="2">Урьдчилгааны зориулалт</th>
+        <th rowspan="2" style="width:110px">Олгосон урьдчилгаа</th>
+        <th rowspan="2" style="width:90px">Гүйцэтгэл (дүн)</th>
+        <th colspan="2">Хянасан</th>
+        <th rowspan="2" style="width:100px">Хавсаргасан баримтын №</th>
+      </tr>
+      <tr>
+        <th style="width:70px">Илүү</th>
+        <th style="width:70px">Дутуу</th>
+      </tr>
+    </thead>
+    <tbody id="t2-body">
+      <tr><td class="text-center">1</td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td></tr>
+      <tr><td class="text-center">2</td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td></tr>
+      <tr><td class="text-center">3</td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td></tr>
+      <tr><td class="text-center">4</td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td></tr>
+      <tr><td class="text-center">5</td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td></tr>
+    </tbody>
+    <tfoot>
+      <tr>
+        <td colspan="2" class="text-end fw-bold">Нийт</td>
+        <td contenteditable="true" class="text-end num"></td>
+        <td contenteditable="true" class="text-end num"></td>
+        <td contenteditable="true" class="text-end num"></td>
+        <td contenteditable="true" class="text-end num"></td>
+        <td></td>
+      </tr>
+    </tfoot>
+  </table>
+
+  <div class="form-row-line mt-3">
+    <span>Тайлан гаргасан:</span>
+    <span contenteditable="true" class="form-fill underline-fill flex-fill"></span>
+    <span>/</span>
+    <span contenteditable="true" class="form-fill underline-fill" style="min-width:100px"></span>
+    <span>/</span>
+  </div>
+
+  <div class="form-row-line mt-2">
+    <span>Үлдэгдэл буюу илүү зарцуулсны талаарх шийдвэр:</span>
+    <span contenteditable="true" class="form-fill underline-fill flex-fill"></span>
+  </div>
+  <div class="form-row-line"><span contenteditable="true" class="form-fill underline-fill flex-fill">&nbsp;</span></div>
+  <div class="form-row-line"><span contenteditable="true" class="form-fill underline-fill flex-fill">&nbsp;</span></div>
+
+  <div class="sig-row mt-4">
+    <div class="sig-stamp">Тэмдэг</div>
+    <div class="sig-right" style="flex:1">
+      <div class="sig-row-line">
+        <span class="sig-label">Захирал</span>
+        <span class="sig-dash"></span>
+        <span class="sig-name-right">{{ company.director }}</span>
+      </div>
+      <div class="sig-row-line mt-2">
+        <span class="sig-label">Нягтлан бодогч</span>
+        <span class="sig-dash"></span>
+        <span class="sig-name-right">{{ company.accountant }}</span>
+      </div>
+      <div class="mt-2" style="font-size:10pt">20... оны ... сарын ... өдөр</div>
+    </div>
+  </div>
+
+</div>
+</div>
+
+<div class="text-center mt-3 no-print">
+  <button class="btn btn-outline-warning btn-sm" onclick="addRow()">
+    <i class="fas fa-plus me-1"></i>Мөр нэмэх
+  </button>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<style>
+.form-doc-wrap { display:flex; justify-content:center; padding:20px 0; }
+.form-doc-page { width:210mm; min-height:280mm; padding:14mm 18mm; background:#fff; border:1px solid #ccc; box-shadow:0 2px 16px rgba(0,0,0,.1); font-family:Arial,sans-serif; font-size:11pt; }
+.form-ref-top { display:flex; justify-content:space-between; font-size:9pt; color:#555; }
+.form-ref-right { text-align:right; }
+.form-title { text-align:center; font-size:13pt; font-weight:bold; margin:12px 0 14px; }
+.form-row-line { display:flex; align-items:baseline; gap:5px; flex-wrap:wrap; margin-top:4px; }
+.form-fill { display:inline-block; }
+.underline-fill { border-bottom:1px solid #333; outline:none; padding:0 3px; }
+.flex-fill { flex:1; }
+.t2-table { width:100%; border-collapse:collapse; font-size:10pt; margin-top:8px; }
+.t2-table th, .t2-table td { border:1px solid #333; padding:4px 5px; }
+.t2-table thead th { background:#e8eaf6; font-weight:700; text-align:center; }
+.t2-table tfoot td { border:1px solid #333; padding:4px 5px; background:#f5f5f5; }
+.t2-table tbody td[contenteditable] { outline:none; min-height:20px; }
+.sig-row { display:flex; gap:20px; align-items:flex-start; }
+.sig-stamp { width:76px; height:76px; border:1.5px dashed #888; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:9pt; color:#888; flex-shrink:0; margin-top:4px; }
+.sig-right { flex:1; font-size:10.5pt; line-height:2; }
+.sig-row-line { display:flex; align-items:baseline; gap:6px; }
+.sig-label { white-space:nowrap; font-size:10.5pt; min-width:110px; }
+.sig-dash { flex:1; border-bottom:1px solid #333; }
+.sig-name-right { white-space:nowrap; font-size:10.5pt; font-weight:600; min-width:100px; text-align:right; }
+@media print {
+  .sidebar,.topbar,.no-print,.content-area > .alert { display:none !important; }
+  .main-content { margin-left:0 !important; }
+  .content-area { padding:0 !important; }
+  .form-doc-wrap { padding:0; }
+  .form-doc-page { border:none; box-shadow:none; margin:0; width:100%; }
+  [contenteditable] { outline:none !important; }
+  .t2-table thead th { background:#e8eaf6 !important; -webkit-print-color-adjust:exact; }
+}
+</style>
+<script>
+let rowN = 5;
+function addRow() {
+  rowN++;
+  const tbody = document.getElementById('t2-body');
+  const tr = document.createElement('tr');
+  tr.innerHTML = `<td class="text-center">${rowN}</td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td>`;
+  tbody.appendChild(tr);
+}
+</script>
+{% endblock %}

@@ -1,0 +1,735 @@
+{% extends "base.html" %}
+{% block title %}{{ partner.name }}{% endblock %}
+{% block page_title %}{{ partner.name }}{% endblock %}
+
+{% block topbar_actions %}
+<button onclick="window.print()" class="btn btn-outline-secondary btn-sm me-2 no-print">
+    <i class="fas fa-print me-1"></i>Хэвлэх
+</button>
+<a href="{{ url_for('reconcile_act', id=partner.id, date_from=date_from, date_to=date_to) }}"
+   target="_blank" class="btn btn-outline-success btn-sm me-2 no-print">
+    <i class="fas fa-file-contract me-1"></i>Тооцоо нийлсэн акт
+</a>
+<a href="{{ url_for('edit_partner', id=partner.id) }}" class="btn btn-outline-primary btn-sm no-print">
+    <i class="fas fa-edit me-1"></i>Засах
+</a>
+{% endblock %}
+
+{% block content %}
+
+{# ── Мэдээлэл + огноо шүүлт ── #}
+<div class="card mb-3">
+  <div class="card-body py-2">
+    <div class="row align-items-center g-2">
+      <div class="col-md-2"><span class="text-muted small">Регистр</span><div class="fw-semibold">{{ partner.register or '—' }}</div></div>
+      <div class="col-md-2"><span class="text-muted small">Утас</span><div>{{ partner.phone or '—' }}</div></div>
+      <div class="col-md-3"><span class="text-muted small">И-мэйл</span><div>{{ partner.email or '—' }}</div></div>
+      <div class="col-md-5 no-print">
+        <form method="get" class="d-flex gap-2 align-items-end justify-content-end flex-wrap">
+          <div>
+            <label class="form-label small mb-0 text-muted">Эхлэх огноо</label>
+            <input type="date" name="date_from" value="{{ date_from }}"
+                   class="form-control form-control-sm" style="width:140px">
+          </div>
+          <div>
+            <label class="form-label small mb-0 text-muted">Дуусах огноо</label>
+            <input type="date" name="date_to" value="{{ date_to }}"
+                   class="form-control form-control-sm" style="width:140px">
+          </div>
+          <div class="d-flex gap-1">
+            <button class="btn btn-primary btn-sm"><i class="fas fa-sync me-1"></i>Харуулах</button>
+            <button type="button" class="btn btn-outline-secondary btn-sm quick" data-from="{{ now.year }}-01-01" data-to="{{ now.strftime('%Y-%m-%d') }}">{{ now.year }} жил</button>
+            <button type="button" class="btn btn-outline-secondary btn-sm quick"
+                    data-from="{{ now.year }}-{{ '%02d'|format(now.month) }}-01"
+                    data-to="{{ now.strftime('%Y-%m-%d') }}">Энэ сар</button>
+            {% if date_from or date_to %}
+            <a href="{{ url_for('view_partner', id=partner.id) }}" class="btn btn-outline-danger btn-sm">
+              <i class="fas fa-times"></i>
+            </a>
+            {% endif %}
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+{# ── Stat cards ── #}
+<div class="row g-2 mb-3">
+  <div class="col">
+    <div class="stat-card bg-blue">
+      <i class="fas fa-arrow-down icon"></i>
+      <h6>Банкны орлого</h6>
+      <h2 class="num" style="font-size:1.2rem">{{ "{:,.0f}".format(total_bank_income) }}₮</h2>
+      <small style="opacity:.8">{{ cash_txns|selectattr('income')|list|length }} гүйлгээ</small>
+    </div>
+  </div>
+  <div class="col">
+    <div class="stat-card bg-orange">
+      <i class="fas fa-arrow-up icon"></i>
+      <h6>Банкны зарлага</h6>
+      <h2 class="num" style="font-size:1.2rem">{{ "{:,.0f}".format(total_bank_expense) }}₮</h2>
+      <small style="opacity:.8">{{ cash_txns|selectattr('expense')|list|length }} гүйлгээ</small>
+    </div>
+  </div>
+  <div class="col">
+    <div class="stat-card bg-green">
+      <i class="fas fa-receipt icon"></i>
+      <h6>E-Бариmt борлуулалт</h6>
+      <h2 class="num" style="font-size:1.2rem">{{ "{:,.0f}".format(total_vat_out_total) }}₮</h2>
+      <small style="opacity:.8">{{ vat_out|length }} анхны баримт{% if vat_out_closing %} · {{ vat_out_closing|length }} хаалтын{% endif %}</small>
+    </div>
+  </div>
+  <div class="col">
+    <div class="stat-card bg-purple">
+      <i class="fas fa-shopping-cart icon"></i>
+      <h6>E-Бариmt худалдан авалт</h6>
+      <h2 class="num" style="font-size:1.2rem">{{ "{:,.0f}".format(total_vat_in_total) }}₮</h2>
+      <small style="opacity:.8">{{ vat_in|length }} баримт</small>
+    </div>
+  </div>
+  {% if total_bank_income or total_vat_out_total %}
+  {% set diff = total_bank_income - total_vat_out_total %}
+  <div class="col">
+    <div class="stat-card {{ 'bg-green' if diff|abs < 1 else 'bg-red' }}">
+      <i class="fas fa-balance-scale icon"></i>
+      <h6>Орлого тулгалт</h6>
+      <h2 class="num" style="font-size:1.2rem">{{ "{:,.0f}".format(diff|abs) }}₮</h2>
+      <small style="opacity:.8">
+        {% if diff|abs < 1 %}Тэнцэж байна ✓
+        {% elif diff > 0 %}Банк илүү
+        {% else %}Баримт илүү{% endif %}
+      </small>
+    </div>
+  </div>
+  {% endif %}
+  <div class="col">
+    <div class="stat-card" style="background:linear-gradient(135deg,#1565C0,#42A5F5)">
+      <i class="fas fa-file-invoice icon"></i>
+      <h6>Нэхэмжлэл</h6>
+      <h2 class="num" style="font-size:1.2rem">{{ "{:,.0f}".format(total_recv) }}₮</h2>
+      <small style="opacity:.8">{{ receivables|length }} нэхэмжлэл
+        · Цугласан {{ "{:,.0f}".format(total_paid_recv) }}₮</small>
+    </div>
+  </div>
+</div>
+
+{# ══════════════════════════════════════════════════════════════════
+   E-Бариmt / Банк — хоёр баганаар зэрэгцүүлсэн харагдац
+═══════════════════════════════════════════════════════════════════ #}
+{# ════════════════════════════════════════════════════════
+   Дээд хос: E-Бариmt борлуулалт  ↔  Банкны орлого
+════════════════════════════════════════════════════════ #}
+<div class="row g-3 mb-2">
+
+  {# ── Left: E-Barimt борлуулалт ── #}
+  <div class="col-lg-6">
+    <div class="card h-100">
+      <div class="card-header d-flex justify-content-between align-items-center"
+           style="background:linear-gradient(90deg,#1B5E20,#388E3C);color:#fff;padding:6px 12px">
+        <span><i class="fas fa-receipt me-2"></i><strong>E-Бариmt борлуулалт</strong> <small class="opacity-75">(анхны нэхэмжлэл)</small></span>
+        <span class="badge bg-light text-dark">{{ vat_out|length }} баримт</span>
+      </div>
+      <div class="card-body p-0" style="max-height:420px;overflow-y:auto">
+        <table class="table table-sm table-hover mb-0" style="font-size:0.8rem">
+          <thead style="position:sticky;top:0;background:#e8f5e9;z-index:1">
+            <tr>
+              <th style="width:80px">Огноо</th>
+              <th>Нэхэмжлэл / ДДТД</th>
+              <th class="text-end" style="width:90px">НӨАТ-гүй</th>
+              <th class="text-end" style="width:70px">НӨАТ</th>
+              <th class="text-end" style="width:95px">Нийт</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for v in vat_out %}
+            <tr class="hover-row" style="cursor:pointer" onclick="toggleDetail('vo{{ loop.index }}')">
+              <td class="text-muted">{{ v.date.strftime('%Y-%m-%d') if v.date else '—' }}</td>
+              <td>
+                {% if v.invoice_no %}<span class="badge bg-light text-dark border me-1" style="font-size:0.68rem">{{ v.invoice_no }}</span>{% endif %}
+                <span class="font-monospace text-muted" style="font-size:0.7rem">{{ (v.ddtd or '')[:18] }}</span>
+              </td>
+              <td class="text-end num text-success">{{ "{:,.0f}".format(v.amount) }}</td>
+              <td class="text-end num text-muted">{{ "{:,.0f}".format(v.vat_amount) }}</td>
+              <td class="text-end num fw-semibold text-success">{{ "{:,.0f}".format(v.total_amount) }}₮</td>
+            </tr>
+            <tr id="vo{{ loop.index }}" class="d-none detail-expand" style="background:#f1f8f2">
+              <td colspan="5" class="py-2 ps-4">
+                <div class="row g-2 small">
+                  <div class="col-6"><span class="text-muted">ДДТД:</span> <span class="font-monospace">{{ v.ddtd or '—' }}</span></div>
+                  <div class="col-6"><span class="text-muted">Нэхэмжлэл №:</span> {{ v.invoice_no or '—' }}</div>
+                  <div class="col-6"><span class="text-muted">Харилцагч:</span> {{ v.partner_name or partner.name }}</div>
+                  <div class="col-6"><span class="text-muted">Регистр:</span> {{ v.partner_register or '—' }}</div>
+                  <div class="col-6"><span class="text-muted">Татварын төрөл:</span> {{ v.tax_type or '—' }}</div>
+                  <div class="col-6"><span class="text-muted">Эх сурвалж:</span> {{ v.source or '—' }}</div>
+                  <div class="col-6"><span class="text-muted">E-Barimt статус:</span>
+                    <span class="badge {{ 'bg-success' if v.ebarimt_sent else 'bg-secondary' }}">{{ v.ebarimt_status or '—' }}</span>
+                  </div>
+                  <div class="col-6">
+                    <span class="text-muted">НӨАТ-гүй:</span> <strong>{{ "{:,.0f}".format(v.amount) }}₮</strong> +
+                    <span class="text-muted">НӨАТ:</span> <strong class="text-danger">{{ "{:,.0f}".format(v.vat_amount) }}₮</strong> =
+                    <strong class="text-success">{{ "{:,.0f}".format(v.total_amount) }}₮</strong>
+                  </div>
+                </div>
+              </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="5" class="text-center py-4 text-muted">
+              <i class="fas fa-receipt fa-2x d-block mb-2 opacity-25"></i>E-Бариmt баримт байхгүй
+            </td></tr>
+            {% endfor %}
+          </tbody>
+          {% if vat_out %}
+          <tfoot style="background:#c8e6c9;position:sticky;bottom:0">
+            <tr class="fw-bold">
+              <td colspan="2" class="text-end small">Нийт {{ vat_out|length }}:</td>
+              <td class="text-end num text-success">{{ "{:,.0f}".format(vat_out|sum(attribute='amount')) }}</td>
+              <td class="text-end num text-muted">{{ "{:,.0f}".format(vat_out|sum(attribute='vat_amount')) }}</td>
+              <td class="text-end num text-success">{{ "{:,.0f}".format(total_vat_out_total) }}₮</td>
+            </tr>
+          </tfoot>
+          {% endif %}
+        </table>
+      </div>
+      {# ── Хаалтын баримтууд (нуугдсан, дарвал нээгдэнэ) ── #}
+      {% if vat_out_closing %}
+      <div class="card-footer p-0">
+        <button class="btn btn-sm btn-link text-muted w-100 py-1" style="font-size:0.75rem"
+                type="button" data-bs-toggle="collapse" data-bs-target="#vatClosingRows">
+          <i class="fas fa-chevron-down me-1"></i>Хаалтын баримт {{ vat_out_closing|length }} ширхэг
+          ({{ "{:,.0f}".format(vat_out_closing|sum(attribute='total_amount')) }}₮) — орлого биш
+        </button>
+        <div class="collapse" id="vatClosingRows">
+          <table class="table table-sm mb-0" style="font-size:0.75rem;background:#fff8e1">
+            <thead style="background:#fff3cd">
+              <tr>
+                <th style="width:80px">Огноо</th>
+                <th>ДДТД / Толгой ДДТД</th>
+                <th class="text-end" style="width:95px">Нийт дүн</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for v in vat_out_closing %}
+              <tr>
+                <td class="text-muted">{{ v.date.strftime('%m/%d') if v.date else '—' }}</td>
+                <td>
+                  <span class="font-monospace text-muted" style="font-size:0.68rem">{{ (v.ddtd or '')[:18] }}</span>
+                  {% if v.parent_ddtd %}
+                  <br><small class="text-warning"><i class="fas fa-link me-1"></i>Толгой: {{ v.parent_ddtd[:18] }}</small>
+                  {% endif %}
+                </td>
+                <td class="text-end num text-warning">{{ "{:,.0f}".format(v.total_amount) }}₮</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  {# ── Right: Банкны орлого ── #}
+  <div class="col-lg-6">
+    <div class="card h-100">
+      <div class="card-header d-flex justify-content-between align-items-center"
+           style="background:linear-gradient(90deg,#0D47A1,#1976D2);color:#fff;padding:6px 12px">
+        <span><i class="fas fa-university me-2"></i><strong>Банкны орлого</strong></span>
+        <span class="badge bg-light text-dark">{{ cash_txns|selectattr('income')|list|length }} гүйлгээ</span>
+      </div>
+      <div class="card-body p-0" style="max-height:420px;overflow-y:auto">
+        <table class="table table-sm table-hover mb-0" style="font-size:0.8rem">
+          <thead style="position:sticky;top:0;background:#e3f2fd;z-index:1">
+            <tr>
+              <th style="width:80px">Огноо</th>
+              <th>Гүйлгээний утга</th>
+              <th class="text-end" style="width:80px">Банк</th>
+              <th class="text-end" style="width:105px">Орлого</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for t in cash_txns if t.income %}
+            <tr class="hover-row" style="cursor:pointer" onclick="toggleDetail('bi{{ loop.index }}')">
+              <td class="text-muted">{{ t.date.strftime('%Y-%m-%d') if t.date else '—' }}</td>
+              <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"
+                  title="{{ t.description }}">{{ t.description or '—' }}</td>
+              <td class="text-end text-muted small">{{ (t.bank or '')[:10] }}</td>
+              <td class="text-end num fw-semibold text-primary">{{ "{:,.0f}".format(t.income) }}₮</td>
+            </tr>
+            <tr id="bi{{ loop.index }}" class="d-none detail-expand" style="background:#e8f0fe"
+                data-txn-id="{{ t.id }}">
+              <td colspan="4" class="py-2 px-3">
+                <div class="row g-1 small mb-2">
+                  <div class="col-12"><span class="text-muted">Гүйлгээний утга:</span> {{ t.description or '—' }}</div>
+                  <div class="col-6"><span class="text-muted">Банк:</span> {{ t.bank or '—' }}</div>
+                  <div class="col-6"><span class="text-muted">Харилцагч данс:</span> <span class="font-monospace">{{ t.partner_acc or '—' }}</span></div>
+                  <div class="col-6">
+                    <span class="text-muted">Ангилал:</span>
+                    <span class="badge bg-primary">{{ t.income_cat or '—' }}</span>
+                    <button class="btn btn-outline-secondary btn-sm ms-1" style="padding:0 4px;font-size:0.68rem"
+                            onclick="event.stopPropagation();openCatEdit({{ t.id }}, '{{ t.income_cat or '' }}')">
+                      <i class="fas fa-pen"></i>
+                    </button>
+                  </div>
+                  <div class="col-6"><span class="text-muted">Орлого:</span> <strong class="text-primary">{{ "{:,.0f}".format(t.income) }}₮</strong></div>
+                </div>
+                {# Журнаалын бичилт #}
+                <div class="journal-lines-container" style="font-size:0.78rem">
+                  <div class="text-muted small mb-1"><i class="fas fa-book me-1"></i>Журнаалын бичилт <span class="journal-no text-primary"></span></div>
+                  <div class="journal-lines-body">
+                    <span class="text-muted fst-italic">Ачааллаж байна...</span>
+                  </div>
+                </div>
+              </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="4" class="text-center py-4 text-muted">
+              <i class="fas fa-university fa-2x d-block mb-2 opacity-25"></i>Банкны орлого байхгүй
+            </td></tr>
+            {% endfor %}
+          </tbody>
+          {% if total_bank_income %}
+          <tfoot style="background:#bbdefb;position:sticky;bottom:0">
+            <tr class="fw-bold">
+              <td colspan="3" class="text-end small">Нийт орлого:</td>
+              <td class="text-end num text-primary">{{ "{:,.0f}".format(total_bank_income) }}₮</td>
+            </tr>
+          </tfoot>
+          {% endif %}
+        </table>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+{# ── Тулгалтын хэсэг ── #}
+{% if total_bank_income or total_vat_out_total %}
+{% set diff = total_bank_income - total_vat_out_total %}
+<div class="mb-2 px-1 py-1 rounded small d-flex align-items-center gap-3"
+     style="background:{{ '#d4edda' if diff|abs < 1 else '#fff3cd' if diff|abs < (total_bank_income or 1) * 0.1 else '#f8d7da' }}">
+  <i class="fas {{ 'fa-check-circle text-success' if diff|abs < 1 else 'fa-exclamation-triangle text-warning' }}"></i>
+  <strong>Орлогын тулгалт:</strong>
+  <span>Банк <strong>{{ "{:,.0f}".format(total_bank_income) }}₮</strong></span>
+  <span class="text-muted">−</span>
+  <span>E-Бариmt <strong>{{ "{:,.0f}".format(total_vat_out_total) }}₮</strong></span>
+  <span class="text-muted">=</span>
+  <strong class="{{ 'text-success' if diff|abs < 1 else 'text-danger' }}">
+    {% if diff|abs < 1 %}Тэнцэж байна ✓{% else %}Зөрүү {{ "{:,.0f}".format(diff|abs) }}₮ ({{ 'Банк илүү' if diff > 0 else 'Баримт илүү' }}){% endif %}
+  </strong>
+</div>
+{% endif %}
+
+{# ════════════════════════════════════════════════════════
+   Доод хос: E-Бариmt худалдан авалт  ↔  Банкны зарлага
+════════════════════════════════════════════════════════ #}
+<div class="row g-3 mb-3">
+
+  {# ── Left: E-Barimt худалдан авалт ── #}
+  <div class="col-lg-6">
+    <div class="card h-100">
+      <div class="card-header d-flex justify-content-between align-items-center"
+           style="background:linear-gradient(90deg,#E65100,#F57C00);color:#fff;padding:6px 12px">
+        <span><i class="fas fa-shopping-cart me-2"></i><strong>E-Бариmt худалдан авалт</strong></span>
+        <span class="badge bg-light text-dark">{{ vat_in|length }} баримт</span>
+      </div>
+      <div class="card-body p-0" style="max-height:420px;overflow-y:auto">
+        <table class="table table-sm table-hover mb-0" style="font-size:0.8rem">
+          <thead style="position:sticky;top:0;background:#fff3e0;z-index:1">
+            <tr>
+              <th style="width:80px">Огноо</th>
+              <th>Нэхэмжлэл / ДДТД</th>
+              <th class="text-end" style="width:90px">НӨАТ-гүй</th>
+              <th class="text-end" style="width:70px">НӨАТ</th>
+              <th class="text-end" style="width:95px">Нийт</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for v in vat_in %}
+            <tr class="hover-row" style="cursor:pointer;background:#fff8e1" onclick="toggleDetail('vi{{ loop.index }}')">
+              <td class="text-muted">{{ v.date.strftime('%Y-%m-%d') if v.date else '—' }}</td>
+              <td>
+                {% if v.invoice_no %}<span class="badge bg-light text-dark border me-1" style="font-size:0.68rem">{{ v.invoice_no }}</span>{% endif %}
+                <span class="font-monospace text-muted" style="font-size:0.7rem">{{ (v.ddtd or '')[:18] }}</span>
+              </td>
+              <td class="text-end num text-warning">{{ "{:,.0f}".format(v.amount) }}</td>
+              <td class="text-end num text-muted">{{ "{:,.0f}".format(v.vat_amount) }}</td>
+              <td class="text-end num fw-semibold text-warning">{{ "{:,.0f}".format(v.total_amount) }}₮</td>
+            </tr>
+            <tr id="vi{{ loop.index }}" class="d-none detail-expand" style="background:#fff8e8">
+              <td colspan="5" class="py-2 ps-4">
+                <div class="row g-2 small">
+                  <div class="col-6"><span class="text-muted">ДДТД:</span> <span class="font-monospace">{{ v.ddtd or '—' }}</span></div>
+                  <div class="col-6"><span class="text-muted">Нэхэмжлэл №:</span> {{ v.invoice_no or '—' }}</div>
+                  <div class="col-6"><span class="text-muted">Нийлүүлэгч:</span> {{ v.partner_name or partner.name }}</div>
+                  <div class="col-6"><span class="text-muted">Регистр:</span> {{ v.partner_register or '—' }}</div>
+                  <div class="col-6"><span class="text-muted">Татварын төрөл:</span> {{ v.tax_type or '—' }}</div>
+                  <div class="col-6"><span class="text-muted">Эх сурвалж:</span> {{ v.source or '—' }}</div>
+                  <div class="col-12">
+                    <span class="text-muted">НӨАТ-гүй:</span> <strong>{{ "{:,.0f}".format(v.amount) }}₮</strong> +
+                    <span class="text-muted">НӨАТ:</span> <strong class="text-danger">{{ "{:,.0f}".format(v.vat_amount) }}₮</strong> =
+                    <strong class="text-warning">{{ "{:,.0f}".format(v.total_amount) }}₮</strong>
+                  </div>
+                </div>
+              </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="5" class="text-center py-4 text-muted">
+              <i class="fas fa-shopping-cart fa-2x d-block mb-2 opacity-25"></i>E-Бариmt байхгүй
+            </td></tr>
+            {% endfor %}
+          </tbody>
+          {% if vat_in %}
+          <tfoot style="background:#ffe0b2;position:sticky;bottom:0" class="fw-bold">
+            <tr>
+              <td colspan="2" class="text-end small">Нийт {{ vat_in|length }}:</td>
+              <td class="text-end num text-warning">{{ "{:,.0f}".format(vat_in|sum(attribute='amount')) }}</td>
+              <td class="text-end num text-muted">{{ "{:,.0f}".format(vat_in|sum(attribute='vat_amount')) }}</td>
+              <td class="text-end num text-warning">{{ "{:,.0f}".format(total_vat_in_total) }}₮</td>
+            </tr>
+          </tfoot>
+          {% endif %}
+        </table>
+      </div>
+    </div>
+  </div>
+
+  {# ── Right: Банкны зарлага ── #}
+  <div class="col-lg-6">
+    <div class="card h-100">
+      <div class="card-header d-flex justify-content-between align-items-center"
+           style="background:linear-gradient(90deg,#37474f,#546e7a);color:#fff;padding:6px 12px">
+        <span><i class="fas fa-arrow-up me-2"></i><strong>Банкны зарлага</strong></span>
+        <span class="badge bg-light text-dark">{{ cash_txns|selectattr('expense')|list|length }} гүйлгээ</span>
+      </div>
+      <div class="card-body p-0" style="max-height:420px;overflow-y:auto">
+        <table class="table table-sm table-hover mb-0" style="font-size:0.8rem">
+          <thead style="position:sticky;top:0;background:#eceff1;z-index:1">
+            <tr>
+              <th style="width:80px">Огноо</th>
+              <th>Гүйлгээний утга</th>
+              <th class="text-end" style="width:80px">Банк</th>
+              <th class="text-end" style="width:105px">Зарлага</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for t in cash_txns if t.expense %}
+            <tr class="hover-row" style="cursor:pointer" onclick="toggleDetail('be{{ loop.index }}')">
+              <td class="text-muted">{{ t.date.strftime('%Y-%m-%d') if t.date else '—' }}</td>
+              <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"
+                  title="{{ t.description }}">{{ t.description or '—' }}</td>
+              <td class="text-end text-muted small">{{ (t.bank or '')[:10] }}</td>
+              <td class="text-end num fw-semibold text-danger">{{ "{:,.0f}".format(t.expense) }}₮</td>
+            </tr>
+            <tr id="be{{ loop.index }}" class="d-none detail-expand" style="background:#f5f5f5"
+                data-txn-id="{{ t.id }}">
+              <td colspan="4" class="py-2 px-3">
+                <div class="row g-1 small mb-2">
+                  <div class="col-12"><span class="text-muted">Гүйлгээний утга:</span> {{ t.description or '—' }}</div>
+                  <div class="col-6"><span class="text-muted">Банк:</span> {{ t.bank or '—' }}</div>
+                  <div class="col-6"><span class="text-muted">Харилцагч данс:</span> <span class="font-monospace">{{ t.partner_acc or '—' }}</span></div>
+                  <div class="col-6">
+                    <span class="text-muted">Ангилал:</span>
+                    <span class="badge bg-secondary">{{ t.expense_cat or '—' }}</span>
+                    <button class="btn btn-outline-secondary btn-sm ms-1" style="padding:0 4px;font-size:0.68rem"
+                            onclick="event.stopPropagation();openCatEdit({{ t.id }}, '{{ t.expense_cat or '' }}')">
+                      <i class="fas fa-pen"></i>
+                    </button>
+                  </div>
+                  <div class="col-6"><span class="text-muted">Зарлага:</span> <strong class="text-danger">{{ "{:,.0f}".format(t.expense) }}₮</strong></div>
+                </div>
+                {# Журнаалын бичилт #}
+                <div class="journal-lines-container" style="font-size:0.78rem">
+                  <div class="text-muted small mb-1"><i class="fas fa-book me-1"></i>Журнаалын бичилт <span class="journal-no text-primary"></span></div>
+                  <div class="journal-lines-body">
+                    <span class="text-muted fst-italic">Ачааллаж байна...</span>
+                  </div>
+                </div>
+              </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="4" class="text-center py-4 text-muted">
+              <i class="fas fa-arrow-up fa-2x d-block mb-2 opacity-25"></i>Банкны зарлага байхгүй
+            </td></tr>
+            {% endfor %}
+          </tbody>
+          {% if total_bank_expense %}
+          <tfoot style="background:#eceff1;position:sticky;bottom:0" class="fw-bold">
+            <tr>
+              <td colspan="3" class="text-end small">Нийт зарлага:</td>
+              <td class="text-end num text-danger">{{ "{:,.0f}".format(total_bank_expense) }}₮</td>
+            </tr>
+          </tfoot>
+          {% endif %}
+        </table>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+{# ════════════════════════════════════════════════════════
+   Нэхэмжлэхийн жагсаалт
+════════════════════════════════════════════════════════ #}
+{% if receivables %}
+<div class="card mb-3">
+  <div class="card-header d-flex justify-content-between align-items-center"
+       style="background:linear-gradient(90deg,#1565C0,#1976D2);color:#fff;padding:8px 14px">
+    <span><i class="fas fa-file-invoice me-2"></i><strong>Нэхэмжлэхийн жагсаалт</strong></span>
+    <div class="d-flex align-items-center gap-2">
+      <span class="badge bg-light text-dark">{{ receivables|length }} нэхэмжлэл</span>
+      <a href="{{ url_for('add_receivable') }}?partner_id={{ partner.id }}"
+         class="btn btn-sm btn-light no-print" style="padding:1px 10px;font-size:0.78rem">
+        <i class="fas fa-plus me-1"></i>Нэмэх
+      </a>
+    </div>
+  </div>
+  <div class="card-body p-0">
+    <table class="table table-sm table-hover mb-0" style="font-size:0.82rem">
+      <thead style="background:#e3f2fd">
+        <tr>
+          <th style="width:36px" class="text-center text-muted">№</th>
+          <th style="width:120px">Нэхэмж №</th>
+          <th style="width:90px">Огноо</th>
+          <th style="width:85px">Хугацаа</th>
+          <th>Тайлбар</th>
+          <th class="text-end" style="width:120px">Нийт дүн</th>
+          <th class="text-end" style="width:110px">Төлсөн</th>
+          <th class="text-end" style="width:110px">Үлдэгдэл</th>
+          <th style="width:90px">Төлөв</th>
+          <th style="width:44px" class="no-print"></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in receivables %}
+        {% set overdue = r.due_date and r.due_date < now.date() and r.status != 'paid' %}
+        {% set pct = (r.paid_amount / r.amount * 100) if r.amount > 0 else 0 %}
+        <tr class="{{ 'table-danger' if overdue else '' }}">
+          <td class="text-center text-muted" style="font-size:.72rem">{{ loop.index }}</td>
+          <td>
+            <a href="{{ url_for('form_t1', rec=r.id) }}"
+               class="text-decoration-none fw-bold font-monospace text-primary"
+               title="Т-1 маягт">{{ r.invoice_no or '—' }}</a>
+          </td>
+          <td class="text-muted">{{ r.date.strftime('%Y-%m-%d') if r.date else '—' }}</td>
+          <td class="{{ 'text-danger fw-semibold' if overdue else 'text-muted' }}">
+            {% if r.due_date %}{{ r.due_date.strftime('%m-%d') }}{% if overdue %} ⚠{% endif %}{% else %}—{% endif %}
+          </td>
+          <td class="text-muted" style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"
+              title="{{ r.description or '' }}">{{ r.description[:55] if r.description else '—' }}</td>
+          <td class="text-end num">{{ "{:,.0f}".format(r.amount) }}</td>
+          <td class="text-end num text-success">
+            {{ "{:,.0f}".format(r.paid_amount) if r.paid_amount > 0 else '—' }}
+          </td>
+          <td class="text-end num fw-bold {{ 'text-danger' if r.remaining > 0 else 'text-muted' }}">
+            {% if r.remaining > 0 %}{{ "{:,.0f}".format(r.remaining) }}{% else %}—{% endif %}
+          </td>
+          <td>
+            {% if r.status == 'paid' %}
+              <span class="badge bg-success" style="font-size:.68rem">Төлөгдсөн</span>
+            {% elif r.status == 'partial' %}
+              <span class="badge bg-warning text-dark" style="font-size:.68rem">Хэсэгчлэн</span>
+              <div class="progress mt-1" style="height:3px;border-radius:2px">
+                <div class="progress-bar bg-warning" style="width:{{ pct|round(0) }}%"></div>
+              </div>
+            {% else %}
+              <span class="badge {{ 'bg-danger' if overdue else 'bg-secondary' }}" style="font-size:.68rem">
+                {{ 'Хэтэрсэн' if overdue else 'Нээлттэй' }}
+              </span>
+            {% endif %}
+          </td>
+          <td class="no-print">
+            <a href="{{ url_for('form_t1', rec=r.id) }}"
+               class="btn btn-outline-primary btn-sm" style="padding:1px 5px;font-size:.7rem"
+               title="Т-1 хэвлэх"><i class="fas fa-print"></i></a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+      <tfoot style="background:#bbdefb" class="fw-bold">
+        <tr>
+          <td colspan="5" class="text-end small">Нийт {{ receivables|length }} нэхэмжлэл:</td>
+          <td class="text-end num">{{ "{:,.0f}".format(total_recv) }}</td>
+          <td class="text-end num text-success">{{ "{:,.0f}".format(total_paid_recv) }}</td>
+          <td class="text-end num {{ 'text-danger' if (total_recv - total_paid_recv) > 0 else '' }}">
+            {{ "{:,.0f}".format(total_recv - total_paid_recv) if (total_recv - total_paid_recv) > 0 else '—' }}
+          </td>
+          <td colspan="2"></td>
+        </tr>
+      </tfoot>
+    </table>
+  </div>
+</div>
+{% endif %}
+
+<div class="mt-2 no-print">
+  <a href="{{ url_for('partners') }}" class="btn btn-outline-secondary btn-sm">
+    <i class="fas fa-arrow-left me-1"></i>Буцах
+  </a>
+</div>
+
+{# ── Detail Modal ── #}
+<div class="modal fade" id="txnModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header py-2" id="modalHeader">
+        <h6 class="modal-title fw-bold" id="modalTitle"></h6>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body p-0">
+        <table class="table table-sm mb-0">
+          <tbody id="modalBody"></tbody>
+        </table>
+        <!-- Ангилал засах хэсэг -->
+        <div id="catEditSection" class="d-none border-top px-3 py-3" style="background:#f8f9fa">
+          <label class="form-label fw-semibold small mb-1">
+            <i class="fas fa-tag me-1 text-primary"></i>Ангилал засах
+          </label>
+          <div class="d-flex gap-2 align-items-center">
+            <input type="text" id="catInput" class="form-control form-control-sm"
+                   style="max-width:200px" placeholder="жн: 1.1.1"
+                   list="catSuggestions">
+            <datalist id="catSuggestions">
+              <option value="1.1.1">Үйлчилгээний орлого</option>
+              <option value="1.1.2">Авлагын орлого</option>
+              <option value="1.1.3">Хүүгийн орлого</option>
+              <option value="1.1.4">Бусад орлого</option>
+              <option value="2.1.1">Үйл ажиллагааны зардал</option>
+              <option value="2.1.2">Цалингийн зардал</option>
+              <option value="2.1.3">Татварын төлбөр</option>
+              <option value="2.1.4">Бусад зардал</option>
+              <option value="3.1.1">Хөрөнгө оруулалт</option>
+              <option value="4.1.1">Зээлийн орлого</option>
+              <option value="4.1.2">Зээл төлөлт</option>
+            </datalist>
+            <button class="btn btn-primary btn-sm" id="catSaveBtn" onclick="saveCat()">
+              <i class="fas fa-save me-1"></i>Хадгалах
+            </button>
+            <span id="catSaveMsg" class="small text-success d-none">
+              <i class="fas fa-check-circle me-1"></i>Хадгалагдлаа!
+            </span>
+          </div>
+          <div class="text-muted small mt-1">Мөнгөн гүйлгээний тайланд ашигладаг ангилал</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+/* ── Quick date buttons ── */
+document.querySelectorAll('.quick').forEach(b => {
+  b.addEventListener('click', () => {
+    document.querySelector('[name=date_from]').value = b.dataset.from;
+    document.querySelector('[name=date_to]').value   = b.dataset.to;
+    b.closest('form').submit();
+  });
+});
+
+/* ── Inline задаргаа toggle + журнаалын бичилт fetch ── */
+const _jLoaded = new Set();
+
+function toggleDetail(id) {
+  const row = document.getElementById(id);
+  if (!row) return;
+  const prefix = id.replace(/\d+$/, '');
+  document.querySelectorAll('.detail-expand').forEach(r => {
+    if (r.id !== id && r.id.startsWith(prefix)) r.classList.add('d-none');
+  });
+  row.classList.toggle('d-none');
+
+  // Банкны мөр бол журнаалын бичилт ачаалах (bi / be prefix)
+  if (!row.classList.contains('d-none') && (id.startsWith('bi') || id.startsWith('be'))) {
+    const txnId = row.dataset.txnId;
+    if (txnId && !_jLoaded.has(id)) {
+      _jLoaded.add(id);
+      const body  = row.querySelector('.journal-lines-body');
+      const noEl  = row.querySelector('.journal-no');
+      fetch(`/cash/${txnId}/journal`)
+        .then(r => r.json())
+        .then(data => {
+          if (noEl && data.journal_no) noEl.textContent = `— ${data.journal_no}`;
+          if (!data.lines || data.lines.length === 0) {
+            body.innerHTML = '<span class="text-muted fst-italic">Журнаалын бичилт байхгүй</span>';
+            return;
+          }
+          const fmt = n => n ? Number(n).toLocaleString('mn-MN', {maximumFractionDigits:0}) : '—';
+          const rows = data.lines.map(l => `
+            <tr>
+              <td class="font-monospace text-primary" style="width:70px;padding:2px 6px">${l.dt_code}</td>
+              <td style="padding:2px 6px">${l.dt_name}</td>
+              <td class="font-monospace text-danger" style="width:70px;padding:2px 6px">${l.kt_code}</td>
+              <td style="padding:2px 6px">${l.kt_name}</td>
+              <td class="text-end num fw-semibold" style="width:110px;padding:2px 6px">${fmt(l.amount)}₮</td>
+              <td class="text-muted" style="padding:2px 6px">${l.desc}</td>
+            </tr>`).join('');
+          body.innerHTML = `
+            <table class="table table-sm mb-0" style="font-size:0.77rem;border:1px solid #dee2e6;border-radius:4px">
+              <thead style="background:#1a3c5e;color:#fff">
+                <tr>
+                  <th style="padding:2px 6px">ДТ данс</th>
+                  <th style="padding:2px 6px">Нэр</th>
+                  <th style="padding:2px 6px">КТ данс</th>
+                  <th style="padding:2px 6px">Нэр</th>
+                  <th class="text-end" style="padding:2px 6px">Дүн</th>
+                  <th style="padding:2px 6px">Тайлбар</th>
+                </tr>
+              </thead>
+              <tbody>${rows}</tbody>
+            </table>`;
+        })
+        .catch(() => { body.innerHTML = '<span class="text-danger small">Алдаа гарлаа</span>'; });
+    }
+  }
+}
+
+/* ── Ангилал засах ── */
+let _catTxnId = null;
+
+function openCatEdit(txnId, currentCat) {
+  _catTxnId = txnId;
+  const modal = new bootstrap.Modal(document.getElementById('txnModal'));
+  document.getElementById('modalTitle').textContent = '✏️ Ангилал засах';
+  document.getElementById('modalHeader').style.background = '#1565c0';
+  document.getElementById('modalHeader').style.color = '#fff';
+  document.getElementById('modalBody').innerHTML = '';
+  document.getElementById('catEditSection').classList.remove('d-none');
+  document.getElementById('catInput').value = currentCat || '';
+  document.getElementById('catSaveMsg').classList.add('d-none');
+  modal.show();
+}
+
+function saveCat() {
+  const cat = document.getElementById('catInput').value.trim();
+  if (!cat || !_catTxnId) return;
+  const btn = document.getElementById('catSaveBtn');
+  btn.disabled = true;
+  fetch(`/cash/${_catTxnId}/update-cat`, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({cat})
+  })
+  .then(r => r.json())
+  .then(data => {
+    btn.disabled = false;
+    if (data.ok) {
+      const msg = document.getElementById('catSaveMsg');
+      msg.classList.remove('d-none');
+      setTimeout(() => { msg.classList.add('d-none'); location.reload(); }, 1500);
+    }
+  })
+  .catch(() => { btn.disabled = false; });
+}
+</script>
+<style>
+.hover-row:hover td { background: rgba(0,0,0,0.04) !important; }
+@media print {
+  .no-print { display: none !important; }
+  .card { box-shadow: none !important; border: 1px solid #dee2e6 !important; }
+  table { font-size: 8pt !important; }
+}
+</style>
+{% endblock %}

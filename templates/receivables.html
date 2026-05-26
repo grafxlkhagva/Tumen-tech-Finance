@@ -1,0 +1,162 @@
+{% extends "base.html" %}
+{% block title %}Авлагын бүртгэл{% endblock %}
+{% block page_title %}Авлагын бүртгэл{% endblock %}
+
+{% block topbar_actions %}
+<a href="{{ url_for('add_receivable') }}" class="btn btn-primary btn-sm">
+    <i class="fas fa-plus me-1"></i>Авлага нэмэх
+</a>
+{% endblock %}
+
+{% block content %}
+
+{# ── Stat cards ── #}
+<div class="row g-3 mb-3">
+  <div class="col-md-4">
+    <div class="stat-card bg-blue">
+      <i class="fas fa-file-invoice icon"></i>
+      <h6>Нийт нэхэмжлэл</h6>
+      <h2 class="num">{{ "{:,.0f}".format(total) }}₮</h2>
+      <small style="opacity:.8">{{ receivables|length }} харилцагч</small>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="stat-card bg-green">
+      <i class="fas fa-check-circle icon"></i>
+      <h6>Цугласан орлого</h6>
+      <h2 class="num">{{ "{:,.0f}".format(total_collected) }}₮</h2>
+      <small style="opacity:.8">Банкны орлогоор</small>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="stat-card {{ 'bg-orange' if total_remaining > 0 else 'bg-green' }}">
+      <i class="fas fa-clock icon"></i>
+      <h6>Үлдэгдэл авлага</h6>
+      <h2 class="num">{{ "{:,.0f}".format(total_remaining) }}₮</h2>
+      <small style="opacity:.8">Үлдэгдэлтэй</small>
+    </div>
+  </div>
+</div>
+
+{# ── Төлөв шүүлт ── #}
+<div class="card mb-3">
+  <div class="card-body py-2 px-3">
+    <div class="btn-group btn-group-sm">
+      <a href="{{ url_for('receivables') }}"
+         class="btn btn-outline-secondary {{ 'active' if not sel_status else '' }}">
+        Бүгд ({{ receivables|length }})
+      </a>
+      <a href="{{ url_for('receivables', status='open') }}"
+         class="btn btn-outline-danger {{ 'active' if sel_status == 'open' else '' }}">
+        Нээлттэй
+      </a>
+      <a href="{{ url_for('receivables', status='partial') }}"
+         class="btn btn-outline-warning {{ 'active' if sel_status == 'partial' else '' }}">
+        Хэсэгчлэн
+      </a>
+      <a href="{{ url_for('receivables', status='paid') }}"
+         class="btn btn-outline-success {{ 'active' if sel_status == 'paid' else '' }}">
+        Төлөгдсөн
+      </a>
+    </div>
+    <span class="text-muted small ms-3">
+      <i class="fas fa-info-circle me-1"></i>
+      E-Бариmt нэхэмжлэл + банкны орлогоос автоматаар тооцоолсон
+    </span>
+  </div>
+</div>
+
+{# ── Хүснэгт ── #}
+<div class="card">
+  <div class="card-body p-0">
+    <table class="table table-hover table-sm mb-0" style="font-size:0.83rem">
+      <thead class="table-dark">
+        <tr>
+          <th style="width:110px">Код</th>
+          <th>Харилцагч</th>
+          <th style="width:110px">Регистр</th>
+          <th class="text-end" style="width:130px">E-Бариmt дүн</th>
+          <th class="text-end" style="width:130px">Цугласан</th>
+          <th class="text-end" style="width:130px">Үлдэгдэл</th>
+          <th style="width:100px">Тулгалт</th>
+          <th style="width:80px">Төлөв</th>
+          <th class="text-end no-print" style="width:60px"></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in receivables %}
+        {% set pct = (r.paid_amount / r.amount * 100) if r.amount > 0 else 0 %}
+        <tr>
+          <td class="text-muted" style="font-size:0.78rem;font-family:monospace">
+            {{ r.partner.code or '—' }}
+          </td>
+          <td>
+            <a href="{{ url_for('view_partner', id=r.partner.id) }}"
+               class="text-decoration-none fw-semibold text-dark">
+              {{ r.partner.name }}
+            </a>
+            {% if r.invoice_no is defined and r.invoice_no %}
+            <span class="badge bg-light text-dark border ms-1" style="font-size:0.7rem">
+              {{ r.invoice_no }}
+            </span>
+            {% endif %}
+          </td>
+          <td class="text-muted" style="font-size:0.78rem">{{ r.partner.register or '—' }}</td>
+          <td class="text-end num">{{ "{:,.0f}".format(r.amount) }}₮</td>
+          <td class="text-end num text-success">{{ "{:,.0f}".format(r.paid_amount) }}₮</td>
+          <td class="text-end num fw-bold {{ 'text-danger' if r.remaining > 0 else 'text-success' }}">
+            {{ "{:,.0f}".format(r.remaining) }}₮
+          </td>
+          <td>
+            <div class="progress" style="height:6px;border-radius:3px">
+              <div class="progress-bar {{ 'bg-success' if pct >= 100 else 'bg-warning' }}"
+                   style="width:{{ [pct,100]|min }}%"></div>
+            </div>
+            <div class="text-muted" style="font-size:0.7rem">{{ "{:.0f}".format(pct) }}%</div>
+          </td>
+          <td>
+            {% if r.status == 'paid' %}
+              <span class="badge bg-success">Төлөгдсөн</span>
+            {% elif r.status == 'partial' %}
+              <span class="badge bg-warning text-dark">Хэсэгчлэн</span>
+            {% else %}
+              <span class="badge bg-danger">Нээлттэй</span>
+            {% endif %}
+          </td>
+          <td class="text-end no-print">
+            <a href="{{ url_for('view_partner', id=r.partner.id) }}"
+               class="btn btn-outline-primary btn-sm" style="padding:1px 6px;font-size:0.75rem"
+               title="Харилцагч харах">
+              <i class="fas fa-eye"></i>
+            </a>
+          </td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="9" class="text-center py-5 text-muted">
+            <i class="fas fa-file-invoice fa-2x d-block mb-2 opacity-25"></i>
+            Авлагын бүртгэл байхгүй байна
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+      {% if receivables %}
+      <tfoot class="fw-bold" style="background:#e8f0fe">
+        <tr>
+          <td></td>
+          <td class="text-end text-muted small">Нийт {{ receivables|length }} харилцагч:</td>
+          <td></td>
+          <td class="text-end num text-primary">{{ "{:,.0f}".format(total) }}₮</td>
+          <td class="text-end num text-success">{{ "{:,.0f}".format(total_collected) }}₮</td>
+          <td class="text-end num {{ 'text-danger' if total_remaining > 0 else 'text-success' }}">
+            {{ "{:,.0f}".format(total_remaining) }}₮
+          </td>
+          <td colspan="3"></td>
+        </tr>
+      </tfoot>
+      {% endif %}
+    </table>
+  </div>
+</div>
+
+{% endblock %}

@@ -1,0 +1,120 @@
+{% extends "base.html" %}
+{% block title %}Тайлан{% endblock %}
+{% block page_title %}Санхүүгийн тайлан{% endblock %}
+{% block content %}
+<div class="row g-4">
+  <div class="col-md-6">
+    <a href="{{ url_for('balance_sheet') }}" class="text-decoration-none">
+      <div class="card h-100" style="border-left:4px solid #1976D2">
+        <div class="card-body d-flex align-items-center gap-3 py-4">
+          <div style="font-size:2.5rem;color:#1976D2"><i class="fas fa-balance-scale"></i></div>
+          <div>
+            <h5 class="mb-1">Санхүү байдлын тайлан</h5>
+            <p class="text-muted mb-0 small">Хөрөнгө, өр төлбөр, өмч · Баланс тайлан</p>
+          </div>
+        </div>
+      </div>
+    </a>
+  </div>
+  <div class="col-md-6">
+    <a href="{{ url_for('income_statement') }}" class="text-decoration-none">
+      <div class="card h-100" style="border-left:4px solid #388E3C">
+        <div class="card-body d-flex align-items-center gap-3 py-4">
+          <div style="font-size:2.5rem;color:#388E3C"><i class="fas fa-chart-line"></i></div>
+          <div>
+            <h5 class="mb-1">Орлогын дэлгэрэнгүй тайлан</h5>
+            <p class="text-muted mb-0 small">Орлого, зардал, цэвэр ашиг · ОДТ</p>
+          </div>
+        </div>
+      </div>
+    </a>
+  </div>
+  <div class="col-md-6">
+    <a href="{{ url_for('cashflow_report') }}" class="text-decoration-none">
+      <div class="card h-100" style="border-left:4px solid #0288D1">
+        <div class="card-body d-flex align-items-center gap-3 py-4">
+          <div style="font-size:2.5rem;color:#0288D1"><i class="fas fa-water"></i></div>
+          <div>
+            <h5 class="mb-1">Мөнгөн гүйлгээний тайлан</h5>
+            <p class="text-muted mb-0 small">Үйл ажиллагаа, хөрөнгө оруулалт, санхүүгийн · МГТ</p>
+          </div>
+        </div>
+      </div>
+    </a>
+  </div>
+  <div class="col-md-6">
+    <a href="{{ url_for('equity_report') }}" class="text-decoration-none">
+      <div class="card h-100" style="border-left:4px solid #7B1FA2">
+        <div class="card-body d-flex align-items-center gap-3 py-4">
+          <div style="font-size:2.5rem;color:#7B1FA2"><i class="fas fa-crown"></i></div>
+          <div>
+            <h5 class="mb-1">Өмчийн өөрчлөлтийн тайлан</h5>
+            <p class="text-muted mb-0 small">Дүрмийн сан, хуримтлагдсан ашиг · ӨӨТ</p>
+          </div>
+        </div>
+      </div>
+    </a>
+  </div>
+  <div class="col-md-6">
+    <a href="{{ url_for('trial_balance') }}" class="text-decoration-none">
+      <div class="card h-100" style="border-left:4px solid #F57C00">
+        <div class="card-body d-flex align-items-center gap-3 py-4">
+          <div style="font-size:2.5rem;color:#F57C00"><i class="fas fa-table"></i></div>
+          <div>
+            <h5 class="mb-1">Гүйлгээ баланс</h5>
+            <p class="text-muted mb-0 small">Эхний үлдэгдэл · Гүйлгээ · Эцсийн үлдэгдэл · Trial Balance</p>
+          </div>
+        </div>
+      </div>
+    </a>
+  </div>
+  <div class="col-md-6">
+    <a href="{{ url_for('ledger') }}" class="text-decoration-none">
+      <div class="card h-100" style="border-left:4px solid #00838F">
+        <div class="card-body d-flex align-items-center gap-3 py-4">
+          <div style="font-size:2.5rem;color:#00838F"><i class="fas fa-book"></i></div>
+          <div>
+            <h5 class="mb-1">Дансны хуулга</h5>
+            <p class="text-muted mb-0 small">Данс бүрийн гүйлгээний дэлгэрэнгүй · Ledger</p>
+          </div>
+        </div>
+      </div>
+    </a>
+  </div>
+</div>
+
+{# ── Татварын тайлангууд ── #}
+<h6 class="text-muted mt-4 mb-3 fw-semibold" style="font-size:0.8rem;letter-spacing:.5px">
+  <i class="fas fa-file-invoice-dollar me-1"></i>ТАТВАРЫН ТАЙЛАНГУУД
+</h6>
+<div class="row g-4">
+  <div class="col-md-6">
+    <a href="{{ url_for('cit_report') }}" class="text-decoration-none">
+      <div class="card h-100" style="border-left:4px solid #B71C1C">
+        <div class="card-body d-flex align-items-center gap-3 py-4">
+          <div style="font-size:2.5rem;color:#B71C1C"><i class="fas fa-file-invoice-dollar"></i></div>
+          <div>
+            <h5 class="mb-1">ААНОАТ-ын тайлан</h5>
+            <p class="text-muted mb-0 small">Аж ахуйн нэгжийн орлогын татвар · 10% / 25%</p>
+            <span class="badge bg-danger mt-1" style="font-size:0.65rem">Жилийн тайлан: 2-р сарын 10</span>
+          </div>
+        </div>
+      </div>
+    </a>
+  </div>
+  <div class="col-md-6">
+    <a href="{{ url_for('vat') }}" class="text-decoration-none">
+      <div class="card h-100" style="border-left:4px solid #E65100">
+        <div class="card-body d-flex align-items-center gap-3 py-4">
+          <div style="font-size:2.5rem;color:#E65100"><i class="fas fa-receipt"></i></div>
+          <div>
+            <h5 class="mb-1">НӨАТ-ын бүртгэл</h5>
+            <p class="text-muted mb-0 small">Нэмэгдсэн өртгийн албан татвар · eBarimt</p>
+            <span class="badge bg-warning text-dark mt-1" style="font-size:0.65rem">Улирлын 10-ны дотор</span>
+          </div>
+        </div>
+      </div>
+    </a>
+  </div>
+</div>
+{% endblock %}

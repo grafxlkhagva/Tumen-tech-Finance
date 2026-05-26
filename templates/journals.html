@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+{% block title %}Гүйлгээний бүртгэл{% endblock %}
+{% block page_title %}Гүйлгээний бүртгэл{% endblock %}
+
+{% block topbar_actions %}
+<a href="{{ url_for('export_journals') }}" class="btn btn-outline-success btn-sm me-2">
+    <i class="fas fa-file-excel me-1"></i>Excel
+</a>
+<a href="{{ url_for('add_journal') }}" class="btn btn-primary btn-sm">
+    <i class="fas fa-plus me-1"></i>Гүйлгээ нэмэх
+</a>
+{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-body p-0">
+        <table class="table table-hover table-sm mb-0" style="font-size:0.82rem">
+            <thead class="table-dark">
+                <tr>
+                    <th>Дугаар</th>
+                    <th>Огноо</th>
+                    <th>Тайлбар</th>
+                    <th>Лавлагаа</th>
+                    <th class="text-end">Нийт дүн</th>
+                    <th class="text-center">Төлөв</th>
+                    <th class="text-end">Үйлдэл</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for j in journals %}
+                <tr>
+                    <td class="fw-semibold font-monospace">{{ j.number }}</td>
+                    <td class="text-nowrap">{{ j.date.strftime('%Y-%m-%d') }}</td>
+                    <td>{{ j.description or '—' }}</td>
+                    <td class="text-muted">{{ j.reference or '—' }}</td>
+                    <td class="text-end num">{{ "{:,.0f}".format(j.lines|sum(attribute='amount')) }}₮</td>
+                    <td class="text-center">
+                        {% if j.status == 'posted' %}
+                        <span class="badge badge-posted" style="font-size:0.72rem"><i class="fas fa-check me-1"></i>Баталгаажсан</span>
+                        {% else %}
+                        <span class="badge badge-draft" style="font-size:0.72rem"><i class="fas fa-pencil me-1"></i>Ноорог</span>
+                        {% endif %}
+                    </td>
+                    <td class="text-end">
+                        <a href="{{ url_for('view_journal', id=j.id) }}" class="btn btn-sm btn-outline-primary me-1" style="padding:1px 6px;font-size:0.75rem">
+                            <i class="fas fa-eye"></i>
+                        </a>
+                        {% if j.status == 'draft' %}
+                        <form action="{{ url_for('delete_journal', id=j.id) }}" method="post" class="d-inline"
+                              onsubmit="return confirm('Устгах уу?')">
+                            <button class="btn btn-sm btn-outline-danger"><i class="fas fa-trash"></i></button>
+                        </form>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% else %}
+                <tr><td colspan="7" class="text-center py-5 text-muted">
+                    <i class="fas fa-file-invoice fa-2x mb-2 d-block"></i>
+                    Гүйлгээ байхгүй байна.<br>
+                    <a href="{{ url_for('add_journal') }}" class="btn btn-primary btn-sm mt-2">
+                        <i class="fas fa-plus me-1"></i>Гүйлгээ нэмэх
+                    </a>
+                </td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

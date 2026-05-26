@@ -1,0 +1,415 @@
+{% extends "base.html" %}
+{% block title %}Мөнгөн Гүйлгээний Тайлан{% endblock %}
+{% block page_title %}Мөнгөн Гүйлгээний Тайлан{% endblock %}
+
+{% block topbar_actions %}
+<div class="btn-group me-2 no-print">
+    <a href="{{ url_for('cashflow_report', mode='internal') }}"
+       class="btn btn-sm {% if mode == 'internal' %}btn-primary{% else %}btn-outline-primary{% endif %}">
+        <i class="fas fa-table me-1"></i>Дотоод тайлан
+    </a>
+    <a href="{{ url_for('cashflow_report', mode='official') }}"
+       class="btn btn-sm {% if mode == 'official' %}btn-primary{% else %}btn-outline-primary{% endif %}">
+        <i class="fas fa-landmark me-1"></i>Сангийн яамны маягт
+    </a>
+</div>
+<button onclick="window.print()" class="btn btn-outline-secondary btn-sm no-print">
+    <i class="fas fa-print me-1"></i>Хэвлэх
+</button>
+{% endblock %}
+
+{% block content %}
+
+{# ════════════════════════════════════════════════════════
+   MACRO helpers
+   ════════════════════════════════════════════════════════ #}
+{% macro f(v) %}{% if v %}{{ "{:,.0f}".format(v|abs) }}{% else %}—{% endif %}{% endmacro %}
+{% macro tot(vals) %}{{ "{:,.0f}".format(vals|sum|abs) if vals|sum else '—' }}{% endmacro %}
+
+{# ════════════════════════════════════════════════════════
+   MODE 1 — ДОТООД ТАЙЛАН
+   ════════════════════════════════════════════════════════ #}
+{% if mode == 'internal' %}
+
+{# Print header #}
+<div class="d-none d-print-block text-center mb-3">
+    <div class="fw-bold fs-5">{{ company.name_upper }} / {{ company.name_en }}</div>
+    <h5 class="fw-bold">МӨНГӨН УРСГАЛЫН ТАЙЛАН — {{ report_date.year }} ОН</h5>
+    <div class="small text-muted">Шууд арга (MNT — монгол төгрөг)</div>
+</div>
+
+{# Screen header #}
+<div class="card mb-3 no-print" style="background:linear-gradient(135deg,#1a3c5e,#2196F3);border-radius:12px;">
+    <div class="card-body py-3 text-white text-center">
+        <div class="small opacity-75">{{ company.name_upper }} / {{ company.name_en }}</div>
+        <h5 class="fw-bold mb-0">МӨНГӨН УРСГАЛЫН ТАЙЛАН — {{ report_date.year }} ОН</h5>
+        <div class="small opacity-75">Шууд арга &nbsp;·&nbsp; MNT</div>
+    </div>
+</div>
+
+{% set MN = ['','1-р','2-р','3-р','4-р','5-р','6-р','7-р','8-р','9-р','10-р','11-р','12-р'] %}
+
+<div class="card">
+<div class="table-responsive">
+<table class="table table-sm table-bordered mb-0 cashflow-tbl" style="font-size:0.8rem;min-width:1400px">
+<thead>
+  <tr style="background:#1a3c5e;color:#fff;">
+    <th style="width:40px">Код</th>
+    <th style="min-width:240px">Үзүүлэлт / Тайлбар</th>
+    {% for m in internal.months %}
+    <th class="text-end" style="min-width:95px">{{ MN[m] }} сар</th>
+    {% endfor %}
+    <th class="text-end" style="min-width:110px;background:#0d2137">Нийт</th>
+  </tr>
+</thead>
+<tbody>
+
+{# ── Section header macro ── #}
+{% macro sec_hdr(label, color='#1565C0') %}
+<tr style="background:{{ color }};color:#fff;font-weight:700;">
+  <td></td>
+  <td colspan="{{ 14 }}">{{ label }}</td>
+</tr>
+{% endmacro %}
+
+{% macro sub_hdr(label) %}
+<tr style="background:#e8f0fe;font-weight:600;">
+  <td></td>
+  <td colspan="{{ 14 }}" class="text-uppercase small">{{ label }}</td>
+</tr>
+{% endmacro %}
+
+{% macro data_row(code, label, vals, cls='', indent=1) %}
+<tr class="{{ cls }}">
+  <td class="text-muted small font-monospace" style="white-space:nowrap">{{ code }}</td>
+  <td style="padding-left:{{ (indent*14+6)|string }}px">{{ label }}</td>
+  {% for v in vals %}
+  <td class="text-end num {% if v < 0 %}text-danger{% elif v > 0 %}{% endif %}">
+      {% if v %}{{ "{:,.0f}".format(v) }}{% else %}-{% endif %}
+  </td>
+  {% endfor %}
+  <td class="text-end num fw-semibold {% if vals|sum < 0 %}text-danger{% endif %}">
+      {% if vals|sum %}{{ "{:,.0f}".format(vals|sum) }}{% else %}-{% endif %}
+  </td>
+</tr>
+{% endmacro %}
+
+{% macro total_row(code, label, vals, color='#1565C0') %}
+<tr style="background:{{ color }};color:#fff;font-weight:700;">
+  <td class="font-monospace">{{ code }}</td>
+  <td>{{ label }}</td>
+  {% for v in vals %}
+  <td class="text-end num">{% if v %}{{ "{:,.0f}".format(v) }}{% else %}-{% endif %}</td>
+  {% endfor %}
+  <td class="text-end num" style="background:rgba(0,0,0,0.2)">
+      {% if vals|sum %}{{ "{:,.0f}".format(vals|sum) }}{% else %}-{% endif %}
+  </td>
+</tr>
+{% endmacro %}
+
+{# ════ 1. ҮЙЛАЖИЛЛАГААНЫ МӨНГӨН УРСГАЛ ════ #}
+{{ sec_hdr('ҮЙЛАЖИЛЛАГААНЫ МӨНГӨН УРСГАЛ', '#1565C0') }}
+{{ sub_hdr('Мөнгөн орлого / Cash Inflow') }}
+{{ data_row('1.1.1', 'Үйлчилгээний орлого', internal.r111, indent=2) }}
+{{ data_row('1.1.2', 'Авлагын орлого', internal.r112, indent=2) }}
+{{ data_row('1.1.3', 'Хүүгийн орлого', internal.r113, indent=2) }}
+{{ data_row('1.1.4', 'Тээврийн буцаалт', internal.r114, indent=2) }}
+{{ total_row('', 'Нийт мөнгөн орлого', internal.total_inc, '#1976D2') }}
+
+{{ sub_hdr('Мөнгөн зарлага / Cash Outflow — Гүйцэтгэгчдийн төлбөр') }}
+{{ data_row('1.2.1', 'Дотоод тээврийн төлбөр', internal.r121, indent=2) }}
+{{ data_row('1.2.2', 'Өмнөх сарын тээврийн үлдэгдэл', internal.r122, indent=2) }}
+{{ data_row('1.2.3', 'Бусад (GPS, Каск, Хантаас)', internal.r123, indent=2) }}
+{{ total_row('1.2', 'Гүйцэтгэгчдийн нийт төлбөр', internal.sub12, '#37474F') }}
+
+{{ sub_hdr('Бусад үйл ажиллагааны зарлага') }}
+{{ data_row('2.1.1',  'Цалингийн зардал', internal.r211, indent=2) }}
+{{ data_row('2.1.2',  'Харилцаа холбооны зардал', internal.r212, indent=2) }}
+{{ data_row('2.1.3',  'Албан томилолт', internal.r213, indent=2) }}
+{{ data_row('2.1.4',  'Бичиг хэрэгсэл', internal.r214, indent=2) }}
+{{ data_row('2.1.5',  'Сургалтын зардал', internal.r215, indent=2) }}
+{{ data_row('2.1.6',  'Хангамжийн материал', internal.r216, indent=2) }}
+{{ data_row('2.1.7',  'Реклам & Маркетинг', internal.r217, indent=2) }}
+{{ data_row('2.1.8',  'Маркетингийн судалгаа', internal.r218, indent=2) }}
+{{ data_row('2.1.9',  'HR холбогдох зардал', internal.r219, indent=2) }}
+{{ data_row('2.1.10', 'Түрээсийн зардал', internal.r2110, indent=2) }}
+{{ data_row('2.1.11', 'Коммунал зардал', internal.r2111, indent=2) }}
+{{ data_row('2.1.12', 'Засвар үйлчилгээ', internal.r2112, indent=2) }}
+{{ data_row('2.1.13', 'Даатгалын зардал', internal.r2113, indent=2) }}
+{{ data_row('2.1.14', 'Банкны шимтгэл', internal.r2114, indent=2) }}
+{{ data_row('2.1.15', 'Бусад зардал', internal.r2115, indent=2) }}
+{{ total_row('2.1', 'Бусад үйл ажиллагааны нийт', internal.sub21, '#37474F') }}
+
+{{ sub_hdr('Татвар, НДШ') }}
+{{ data_row('2.2.1', 'ААН орлогын татвар', internal.r221, indent=2) }}
+{{ data_row('2.2.2', 'ХХОАТ', internal.r222, indent=2) }}
+{{ data_row('2.2.3', 'НӨАТ', internal.r223, indent=2) }}
+{{ data_row('2.2.4', 'ЭМНДШ', internal.r224, indent=2) }}
+{{ total_row('2.2', 'Татвар, НДШ нийт', internal.sub22, '#37474F') }}
+
+{{ total_row('', 'Нийт мөнгөн зарлага', internal.total_exp, '#B71C1C') }}
+{{ total_row('', 'ҮЙЛАЖИЛЛАГААНЫ ЦЭВЭР УРСГАЛ', internal.op_net, '#1B5E20') }}
+
+{# ════ 2. ХӨРӨНГӨ ОРУУЛАЛТ ════ #}
+{{ sec_hdr('ХӨРӨНГӨ ОРУУЛАЛТЫН МӨНГӨН УРСГАЛ', '#4A148C') }}
+{{ total_row('3.1', 'Нийт хөрөнгө оруулалтын орлого', internal.inv_inc, '#4A148C') }}
+{{ sub_hdr('Хөрөнгө оруулалтын зарлага') }}
+{{ data_row('3.2.1', 'Тавилга, тоног төхөөрөмж (FF&E)', internal.r321, indent=2) }}
+{{ data_row('3.2.2', 'Эд хогшил', internal.r322, indent=2) }}
+{{ data_row('3.2.3', 'Программ хангамж', internal.r323, indent=2) }}
+{{ data_row('3.2.4', 'Бусад хөрөнгө', internal.r324, indent=2) }}
+{{ total_row('3.2', 'Нийт хөрөнгө оруулалтын зарлага', internal.inv_exp, '#37474F') }}
+{{ total_row('', 'ХӨРӨНГӨ ОРУУЛАЛТЫН ЦЭВЭР УРСГАЛ', internal.inv_net, '#4A148C') }}
+
+{# ════ 3. САНХҮҮЖИЛТ ════ #}
+{{ sec_hdr('САНХҮҮЖИЛТИЙН МӨНГӨН УРСГАЛ', '#006064') }}
+{{ total_row('4.1', 'Нийт санхүүжилтийн орлого', internal.fin_inc, '#006064') }}
+{{ total_row('4.2', 'Нийт санхүүжилтийн зарлага', internal.fin_exp, '#37474F') }}
+{{ total_row('', 'САНХҮҮЖИЛТИЙН ЦЭВЭР УРСГАЛ', internal.fin_net, '#006064') }}
+
+{# ════ 4. ХОЛБООТОЙ БАЙГУУЛАГА / ЗЭЭЛ ════ #}
+{{ sec_hdr('ХОЛБООТОЙ БАЙГУУЛАГА / АЖИЛЧДЫН ЗЭЭЛ', '#BF360C') }}
+{{ sub_hdr('Зээлийн орлого') }}
+{{ data_row('5.1.2', 'Холбоотой байгуулагаас авсан зээл', internal.r512, indent=2) }}
+{{ data_row('5.1.3', 'Ажилчдаас авсан зээлийн буцаалт', internal.r513, indent=2) }}
+{{ total_row('5.1', 'Нийт зээлийн орлого', internal.sub51, '#BF360C') }}
+{{ sub_hdr('Зээлийн зарлага') }}
+{{ data_row('5.2.1', 'Хоорондын тооцоогоор өгсөн', internal.r521, indent=2) }}
+{{ data_row('5.2.2', 'Холбоотой байгуулагад өгсөн зээл', internal.r522, indent=2) }}
+{{ data_row('5.2.3', 'Ажилчдад өгсөн зээл', internal.r523, indent=2) }}
+{{ total_row('5.2', 'Нийт зээлийн зарлага', internal.sub52, '#37474F') }}
+{{ total_row('5', '§5 ЦЭВЭР УРСГАЛ', internal.sec5_net, '#BF360C') }}
+
+{# ════ GRAND TOTAL ════ #}
+{{ total_row('', 'НИЙТ ЦЭВЭР МӨНГӨН УРСГАЛ', internal.net_total, '#0d2137') }}
+
+{# Opening balance row #}
+<tr style="background:#263238;color:#90CAF9;font-weight:600;">
+  <td></td>
+  <td>Эхний үлдэгдэл / Opening Balance</td>
+  {% for v in internal.opening_by_month %}
+  <td class="text-end num">{{ "{:,.0f}".format(v) }}</td>
+  {% endfor %}
+  <td class="text-end num">{{ "{:,.0f}".format(internal.open_cash) }}</td>
+</tr>
+
+{# Closing balance row #}
+<tr style="background:#263238;color:#A5D6A7;font-weight:700;">
+  <td></td>
+  <td>Эцсийн үлдэгдэл / Closing Balance</td>
+  {% for v in internal.closing %}
+  <td class="text-end num {% if v < 0 %}text-warning{% endif %}">{{ "{:,.0f}".format(v) }}</td>
+  {% endfor %}
+  <td class="text-end num {% if internal.closing[-1] < 0 %}text-warning{% endif %}" style="background:rgba(255,255,255,0.1)">
+    {{ "{:,.0f}".format(internal.closing[-1]) }}
+  </td>
+</tr>
+
+</tbody>
+</table>
+</div>
+</div>
+
+<div class="mt-2 text-muted small no-print">
+    Эх сурвалж: ХХБ/ТДБ 411096635 | Голомт банк 1175156757 | М банк 9006906192
+    &nbsp;·&nbsp; Эхний үлдэгдэл: {{ "{:,.0f}".format(internal.open_cash) }}₮ (2025-12-31)
+</div>
+
+{# ════════════════════════════════════════════════════════
+   MODE 2 — САНГИЙН ЯАМНЫ МАЯГТ
+   ════════════════════════════════════════════════════════ #}
+{% else %}
+
+{% macro fmt(v) %}{{ "{:,.0f}".format(v|abs) if v else '—' }}{% endmacro %}
+{% macro row(num, label, v26, v25, bold=false, indent=0) %}
+<tr {% if bold %}class="fw-bold table-light"{% endif %}>
+  <td class="text-muted small" style="width:60px">{{ num }}</td>
+  <td style="padding-left:{{ (indent*16+12)|string }}px">{{ label }}</td>
+  <td class="text-end num {% if v25 < 0 %}text-danger{% endif %}">{{ fmt(v25) }}</td>
+  <td class="text-end num {% if v26 < 0 %}text-danger{% endif %}">{{ fmt(v26) }}</td>
+</tr>
+{% endmacro %}
+
+<!-- Header -->
+<div class="card mb-3">
+  <div class="card-body text-center py-3">
+    <div class="text-muted small">Сангийн Сайдын 2017 оны 361 дүгээр тушаалын 4 дүгээр хавсралт</div>
+    <h4 class="fw-bold mt-2 mb-1">МӨНГӨН ГҮЙЛГЭЭНИЙ ТАЙЛАН</h4>
+    <div class="text-muted">{{ company.name }} &nbsp;·&nbsp; {{ report_date.strftime('%Y оны %m-р сарын %d') }}</div>
+    <div class="text-muted small">Регистр: {{ company.register }} &nbsp;|&nbsp; (төгрөгөөр)</div>
+  </div>
+</div>
+
+<div class="row g-3">
+<div class="col-md-8">
+
+<div class="card mb-3">
+  <div class="card-header text-white fw-bold" style="background:linear-gradient(90deg,#1565C0,#1976D2)">
+    <i class="fas fa-exchange-alt me-2"></i>1. ҮНДСЭН ҮЙЛ АЖИЛЛАГААНЫ МӨНГӨН ГҮЙЛГЭЭ
+  </div>
+  <table class="table table-sm table-hover mb-0">
+    <thead class="table-light">
+      <tr>
+        <th style="width:60px">Мөр</th><th>Үзүүлэлт</th>
+        <th class="text-end">2024-12-31</th>
+        <th class="text-end">{{ report_date.strftime('%Y-%m-%d') }}</th>
+      </tr>
+    </thead>
+    <tbody>
+      {{ row('1.1','Мөнгө орлого', mgt.op_income, mgt25.op_income, indent=1) }}
+      {{ row('1.1.1','Борлуулалтаас орсон мөнгө', mgt.op_income, mgt25.op_income, indent=2) }}
+      {{ row('1.2','Мөнгө зарлага', mgt.op_expense, mgt25.op_expense, indent=1) }}
+      {{ row('1.2.1','Нийлүүлэгч, бусадт төлсөн мөнгө', mgt.op_expense, mgt25.op_expense, indent=2) }}
+    </tbody>
+    <tfoot>
+      <tr class="text-white fw-bold" style="background:linear-gradient(90deg,#1565C0,#1976D2)">
+        <td>1.3</td><td>Үндсэн үйл ажиллагааны цэвэр мөнгөн гүйлгээ</td>
+        <td class="text-end num">{{ "{:,.0f}".format(mgt25.op_net) }}</td>
+        <td class="text-end num {% if mgt.op_net < 0 %}text-warning{% endif %}">{{ "{:,.0f}".format(mgt.op_net) }}</td>
+      </tr>
+    </tfoot>
+  </table>
+</div>
+
+<div class="card mb-3">
+  <div class="card-header text-white fw-bold" style="background:linear-gradient(90deg,#6A1B9A,#8E24AA)">
+    <i class="fas fa-building me-2"></i>2. ХӨРӨНГӨ ОРУУЛАЛТЫН МӨНГӨН ГҮЙЛГЭЭ
+  </div>
+  <table class="table table-sm table-hover mb-0">
+    <thead class="table-light">
+      <tr><th style="width:60px">Мөр</th><th>Үзүүлэлт</th>
+          <th class="text-end">2024-12-31</th><th class="text-end">{{ report_date.strftime('%Y-%m-%d') }}</th></tr>
+    </thead>
+    <tbody>
+      {{ row('2.1','Мөнгө орлого (хөрөнгө борлуулсан)', 0, mgt25.inv_income, indent=1) }}
+      {{ row('2.2','Мөнгө зарлага (хөрөнгө худалдан авсан)', 0, mgt25.inv_expense, indent=1) }}
+    </tbody>
+    <tfoot>
+      <tr class="text-white fw-bold" style="background:linear-gradient(90deg,#6A1B9A,#8E24AA)">
+        <td>2.3</td><td>Хөрөнгө оруулалтын цэвэр мөнгөн гүйлгээ</td>
+        <td class="text-end num">{{ "{:,.0f}".format(mgt25.inv_net) }}</td>
+        <td class="text-end num">—</td>
+      </tr>
+    </tfoot>
+  </table>
+</div>
+
+<div class="card mb-3">
+  <div class="card-header text-white fw-bold" style="background:linear-gradient(90deg,#B71C1C,#E53935)">
+    <i class="fas fa-hand-holding-usd me-2"></i>3. САНХҮҮГИЙН МӨНГӨН ГҮЙЛГЭЭ
+  </div>
+  <table class="table table-sm table-hover mb-0">
+    <thead class="table-light">
+      <tr><th style="width:60px">Мөр</th><th>Үзүүлэлт</th>
+          <th class="text-end">2024-12-31</th><th class="text-end">{{ report_date.strftime('%Y-%m-%d') }}</th></tr>
+    </thead>
+    <tbody>
+      {{ row('3.1','Зээл, зогсоол авсан', 0, mgt25.fin_income, indent=1) }}
+      {{ row('3.2','Зээл, зогсоол төлсөн', 0, mgt25.fin_expense, indent=1) }}
+    </tbody>
+    <tfoot>
+      <tr class="text-white fw-bold" style="background:linear-gradient(90deg,#B71C1C,#E53935)">
+        <td>3.3</td><td>Санхүүгийн цэвэр мөнгөн гүйлгээ</td>
+        <td class="text-end num">{{ "{:,.0f}".format(mgt25.fin_net) }}</td>
+        <td class="text-end num">—</td>
+      </tr>
+    </tfoot>
+  </table>
+</div>
+
+<div class="card border-0 text-white mb-3" style="background:linear-gradient(135deg,#1a3c5e,#2196F3);border-radius:12px;">
+  <div class="card-body py-3">
+    <div class="row align-items-center">
+      <div class="col">
+        <div class="small opacity-75">4. МӨНГӨН ХӨРӨНГИЙН ЦЭВЭР ӨСӨЛТ / (БУУРАЛТ)</div>
+      </div>
+      <div class="col-auto text-end">
+        <div class="small opacity-75">2024: {{ "{:,.0f}".format(mgt25.total_net) }}₮</div>
+        <div class="fs-4 fw-bold">{{ "{:,.0f}".format(mgt.op_net) }}₮</div>
+      </div>
+    </div>
+    <hr class="border-white opacity-25 my-2">
+    <div class="row small">
+      <div class="col">
+        <div class="opacity-75">5. Эхний үлдэгдэл (тайлант үе эхлэх)</div>
+        <div class="opacity-75">6. Эцсийн үлдэгдэл (тайлант үе дуусах)</div>
+      </div>
+      <div class="col-auto text-end">
+        <div>2024: {{ "{:,.0f}".format(mgt25.open_cash) }}₮</div>
+        <div class="fw-bold">2024: {{ "{:,.0f}".format(mgt25.close_cash) }}₮</div>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+
+<!-- Right: Monthly summary -->
+<div class="col-md-4">
+<div class="card">
+  <div class="card-header"><i class="fas fa-chart-bar me-2"></i>Сарын хөдөлгөөн</div>
+  <div class="card-body p-0">
+    <table class="table table-sm mb-0">
+      <thead class="table-light">
+        <tr><th>Сар</th><th class="text-end text-success">Орлого</th><th class="text-end text-danger">Зарлага</th></tr>
+      </thead>
+      <tbody>
+        {% set MN2 = ['','1-р','2-р','3-р','4-р','5-р','6-р','7-р','8-р','9-р','10-р','11-р','12-р'] %}
+        {% for m in mgt.monthly %}
+        <tr>
+          <td>{{ MN2[m.month] if m.month and m.month <= 12 else m.month }}</td>
+          <td class="text-end num small text-success">{{ "{:,.0f}".format(m.income or 0) }}</td>
+          <td class="text-end num small text-danger">{{ "{:,.0f}".format(m.expense or 0) }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+      <tfoot class="table-light fw-bold">
+        <tr>
+          <td>Нийт</td>
+          <td class="text-end num text-success">{{ "{:,.0f}".format(mgt.op_income) }}</td>
+          <td class="text-end num text-danger">{{ "{:,.0f}".format(mgt.op_expense) }}</td>
+        </tr>
+      </tfoot>
+    </table>
+  </div>
+</div>
+<div class="mt-3">
+  <div class="stat-card bg-blue mb-2" style="border-radius:10px;padding:16px;">
+    <div class="icon"><i class="fas fa-arrow-down"></i></div>
+    <h6>Нийт мөнгө орлого</h6>
+    <h2 style="font-size:1.3rem">{{ "{:,.0f}".format(mgt.op_income) }}₮</h2>
+  </div>
+  <div class="stat-card bg-red mb-2" style="border-radius:10px;padding:16px;">
+    <div class="icon"><i class="fas fa-arrow-up"></i></div>
+    <h6>Нийт мөнгө зарлага</h6>
+    <h2 style="font-size:1.3rem">{{ "{:,.0f}".format(mgt.op_expense) }}₮</h2>
+  </div>
+  <div class="stat-card {% if mgt.op_net >= 0 %}bg-green{% else %}bg-orange{% endif %}" style="border-radius:10px;padding:16px;">
+    <div class="icon"><i class="fas fa-equals"></i></div>
+    <h6>Цэвэр гүйлгээ</h6>
+    <h2 style="font-size:1.3rem">{{ "{:,.0f}".format(mgt.op_net) }}₮</h2>
+  </div>
+</div>
+</div>
+</div>
+
+<div class="mt-3 text-muted small no-print">
+  Захирал: {{ company.director }} &nbsp;&nbsp;&nbsp; Нягтлан бодогч: {{ company.accountant }}
+</div>
+
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<style>
+.cashflow-tbl td, .cashflow-tbl th {
+    padding: 3px 8px !important;
+    vertical-align: middle;
+}
+.cashflow-tbl tbody tr:hover { background: rgba(33,150,243,0.05); }
+@media print {
+    .cashflow-tbl { font-size: 7pt !important; }
+    .cashflow-tbl td, .cashflow-tbl th { padding: 2px 4px !important; }
+    @page { size: A3 landscape; margin: 10mm; }
+}
+</style>
+{% endblock %}

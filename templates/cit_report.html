@@ -1,0 +1,453 @@
+{% extends "base.html" %}
+{% block title %}ААНОАТ Тайлан{% endblock %}
+{% block page_title %}Аж ахуйн нэгжийн орлогын албан татварын тайлан{% endblock %}
+
+{% block topbar_actions %}
+<button onclick="window.print()" class="btn btn-primary btn-sm no-print">
+  <i class="fas fa-print me-1"></i>Хэвлэх
+</button>
+<a href="{{ url_for('reports') }}" class="btn btn-outline-secondary btn-sm ms-2 no-print">
+  <i class="fas fa-arrow-left me-1"></i>Буцах
+</a>
+{% endblock %}
+
+{% block content %}
+
+{# ── Шүүлт ─────────────────────────────────────────────────────────── #}
+<div class="card mb-3 no-print">
+  <div class="card-body py-2">
+    <form method="get" class="d-flex flex-wrap gap-3 align-items-end">
+      <div>
+        <label class="form-label small fw-semibold mb-1">Тайлант жил</label>
+        <select name="year" class="form-select form-select-sm" style="width:110px">
+          {% for y in range(cur_year, cur_year - 5, -1) %}
+          <option value="{{ y }}" {% if y == year %}selected{% endif %}>{{ y }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label class="form-label small fw-semibold mb-1">Улирал</label>
+        <select name="quarter" class="form-select form-select-sm" style="width:130px">
+          <option value="" {% if not quarter %}selected{% endif %}>Жилийн тайлан</option>
+          <option value="1" {% if quarter=='1' %}selected{% endif %}>1-р улирал</option>
+          <option value="2" {% if quarter=='2' %}selected{% endif %}>2-р улирал</option>
+          <option value="3" {% if quarter=='3' %}selected{% endif %}>3-р улирал</option>
+          <option value="4" {% if quarter=='4' %}selected{% endif %}>4-р улирал</option>
+        </select>
+      </div>
+      <button type="submit" class="btn btn-success btn-sm mt-3">
+        <i class="fas fa-sync me-1"></i>Шинэчлэх
+      </button>
+    </form>
+  </div>
+</div>
+
+{# ── ХЭВЛЭХ МАЯГТ ──────────────────────────────────────────────────── #}
+<style>
+  .cit-wrap { max-width:900px; margin:0 auto; font-family:'Times New Roman',serif; font-size:0.85rem; }
+  .cit-header { text-align:center; margin-bottom:18px; }
+  .cit-header h2 { font-size:1.05rem; font-weight:bold; text-transform:uppercase; letter-spacing:.5px; }
+  .cit-header h3 { font-size:0.9rem; font-weight:bold; margin-top:4px; }
+  .cit-meta { display:flex; gap:30px; flex-wrap:wrap; border:1px solid #333; padding:8px 12px; margin-bottom:14px; font-size:0.82rem; }
+  .cit-meta span { display:inline-block; }
+  .cit-meta .meta-label { font-weight:bold; }
+  .cit-table { width:100%; border-collapse:collapse; margin-bottom:14px; }
+  .cit-table th, .cit-table td { border:1px solid #444; padding:4px 8px; }
+  .cit-table th { background:#ddd; text-align:center; font-weight:bold; font-size:0.8rem; }
+  .cit-table td:first-child { width:45px; text-align:center; font-weight:bold; }
+  .cit-table td:last-child { width:160px; text-align:right; font-family:'Courier New',monospace; }
+  .section-head td { background:#eee; font-weight:bold; font-size:0.82rem; letter-spacing:.3px; }
+  .total-row td { background:#f5f5f5; font-weight:bold; }
+  .grand-total td { background:#d0e8ff; font-weight:bold; font-size:0.9rem; }
+  .editable { background:#fffff0; }
+  .editable input { border:none; background:transparent; text-align:right; width:100%; font-family:'Courier New',monospace; font-size:0.85rem; }
+  .cit-signature { display:flex; justify-content:space-between; margin-top:24px; font-size:0.82rem; }
+  .cit-signature .sig-box { border-top:1px solid #333; padding-top:4px; min-width:200px; text-align:center; }
+  .pay-box { border:2px solid {% if cit.net_payable > 0 %}#c0392b{% else %}#27ae60{% endif %};
+             border-radius:6px; padding:10px 16px; margin-bottom:14px; text-align:center;
+             background:{% if cit.net_payable > 0 %}#fdf0ee{% else %}#edfaf1{% endif %}; }
+  .pay-box .pay-label { font-size:0.85rem; font-weight:bold; }
+  .pay-box .pay-amount { font-size:1.5rem; font-weight:bold;
+             color:{% if cit.net_payable > 0 %}#c0392b{% else %}#27ae60{% endif %}; }
+  @media print {
+    .no-print { display:none !important; }
+    .cit-wrap { max-width:100%; }
+    .editable input { border-bottom:1px solid #999; }
+    body { font-size:11pt; }
+  }
+</style>
+
+<div class="cit-wrap">
+
+  {# ── Нийт үр дүн (хэвлэхгүй дэлгэцийн) ── #}
+  <div class="no-print mb-3">
+    <div class="pay-box">
+      <div class="pay-label">
+        {% if cit.net_payable > 0 %}
+          <i class="fas fa-exclamation-triangle me-1"></i>НЭМЖ ТӨЛӨХ ТАТВАР
+        {% elif cit.net_refund > 0 %}
+          <i class="fas fa-check-circle me-1"></i>БУЦААН ОЛГОХ ТАТВАР
+        {% else %}
+          <i class="fas fa-equals me-1"></i>ТАТВАР ТЭНЦВЭРТЭЙ
+        {% endif %}
+      </div>
+      <div class="pay-amount">
+        {% if cit.net_payable > 0 %}
+          {{ "{:,.0f}".format(cit.net_payable) }}₮
+        {% elif cit.net_refund > 0 %}
+          {{ "{:,.0f}".format(cit.net_refund) }}₮
+        {% else %}—{% endif %}
+      </div>
+      <div class="small text-muted mt-1">{{ cit.period_label }} · {{ cit.date_from }} – {{ cit.date_to }}</div>
+    </div>
+  </div>
+
+  {# ── Гарчиг ── #}
+  <div class="cit-header">
+    <div style="font-size:0.78rem; text-align:right; margin-bottom:6px">
+      Татварын ерөнхий газрын даргын тушаалын хавсралт
+    </div>
+    <h2>АЖ АХУЙН НЭГЖИЙН ОРЛОГЫН АЛБАН ТАТВАРЫН ТАЙЛАН</h2>
+    <h3>{{ cit.period_label|upper }}</h3>
+  </div>
+
+  {# ── Мета мэдээлэл ── #}
+  <div class="cit-meta">
+    <span><span class="meta-label">Татвар төлөгчийн нэр: </span>
+      <span contenteditable="true" style="min-width:200px;border-bottom:1px solid #999;display:inline-block"
+            class="no-select">Түмэн Тээх ХХК</span>
+    </span>
+    <span><span class="meta-label">ТТД: </span>
+      <span contenteditable="true" style="min-width:100px;border-bottom:1px solid #999;display:inline-block"></span>
+    </span>
+    <span><span class="meta-label">Тайлант үе: </span>
+      {{ cit.date_from }} – {{ cit.date_to }}
+    </span>
+    <span><span class="meta-label">Тайлан өгсөн огноо: </span>
+      <span contenteditable="true" style="min-width:100px;border-bottom:1px solid #999;display:inline-block">{{ cit.date_to }}</span>
+    </span>
+  </div>
+
+  {# ═══════════════════════════════════════════════ #}
+  {# I. ОРЛОГО                                       #}
+  {# ═══════════════════════════════════════════════ #}
+  <table class="cit-table">
+    <thead>
+      <tr>
+        <th style="width:45px">Мөр</th>
+        <th>Үзүүлэлт</th>
+        <th style="width:160px">Дүн (₮)</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr class="section-head">
+        <td colspan="3">I. ОРЛОГО</td>
+      </tr>
+      <tr>
+        <td>1</td>
+        <td>Бараа, ажил, үйлчилгээний борлуулалтын орлого
+          <span class="text-muted" style="font-size:0.73rem">(6110, 6111, 6113)</span></td>
+        <td>{{ "{:,.0f}".format(cit.rev_service) }}</td>
+      </tr>
+      <tr>
+        <td>2</td>
+        <td>Бусад үйл ажиллагааны орлого
+          <span class="text-muted" style="font-size:0.73rem">(6200)</span></td>
+        <td>{{ "{:,.0f}".format(cit.rev_other) }}</td>
+      </tr>
+      <tr>
+        <td>3</td>
+        <td>Санхүүгийн орлого — хүүгийн орлого
+          <span class="text-muted" style="font-size:0.73rem">(8410)</span></td>
+        <td>{{ "{:,.0f}".format(cit.rev_financial) }}</td>
+      </tr>
+      <tr class="total-row">
+        <td>4</td>
+        <td>НИЙТ ОРЛОГО (1+2+3)</td>
+        <td>{{ "{:,.0f}".format(cit.rev_total) }}</td>
+      </tr>
+
+      {# ═══ II. ЗАРДАЛ ═══ #}
+      <tr class="section-head">
+        <td colspan="3">II. ХАСАГДАХ ЗАРДАЛ</td>
+      </tr>
+      <tr>
+        <td>5</td>
+        <td>Борлуулалтын шууд зардал (материал, түлш, засвар, замын хураамж гэх мэт)
+          <span class="text-muted" style="font-size:0.73rem">(7xxx)</span></td>
+        <td>{{ "{:,.0f}".format(cit.exp_cogs) }}</td>
+      </tr>
+      <tr>
+        <td>6</td>
+        <td>Хөдөлмөрийн хөлс, цалин
+          <span class="text-muted" style="font-size:0.73rem">(8110, 8120)</span></td>
+        <td>{{ "{:,.0f}".format(cit.exp_salary) }}</td>
+      </tr>
+      <tr>
+        <td>7</td>
+        <td>Нийгмийн болон эрүүл мэндийн даатгалын шимтгэл (ажил олгогчийн хувь)
+          <span class="text-muted" style="font-size:0.73rem">(8111)</span></td>
+        <td>{{ "{:,.0f}".format(cit.exp_ndsh) }}</td>
+      </tr>
+      <tr>
+        <td>8</td>
+        <td>Элэгдэл, хорогдлын шимтгэл
+          <span class="text-muted" style="font-size:0.73rem">(8510, 8515)</span></td>
+        <td>{{ "{:,.0f}".format(cit.exp_depr) }}</td>
+      </tr>
+      <tr>
+        <td>9</td>
+        <td>Түрээсийн зардал
+          <span class="text-muted" style="font-size:0.73rem">(8210)</span></td>
+        <td>{{ "{:,.0f}".format(cit.exp_rent) }}</td>
+      </tr>
+      <tr>
+        <td>10</td>
+        <td>Нийтийн үйлчилгээ, харилцаа холбоо
+          <span class="text-muted" style="font-size:0.73rem">(8211, 8212)</span></td>
+        <td>{{ "{:,.0f}".format(cit.exp_util) }}</td>
+      </tr>
+      <tr>
+        <td>11</td>
+        <td>Аялал, томилолт, оффисын хэрэглэл
+          <span class="text-muted" style="font-size:0.73rem">(8213, 8214)</span></td>
+        <td>{{ "{:,.0f}".format(cit.exp_travel) }}</td>
+      </tr>
+      <tr>
+        <td>12</td>
+        <td>Санхүүгийн зардал (зээлийн хүү, лизинг, банкны шимтгэл, ханшийн зөрүү)
+          <span class="text-muted" style="font-size:0.73rem">(8310–8313)</span></td>
+        <td>{{ "{:,.0f}".format(cit.exp_fin) }}</td>
+      </tr>
+      <tr>
+        <td>13</td>
+        <td>Бусад хасагдах зардал
+          <span class="text-muted" style="font-size:0.73rem">(8660)</span></td>
+        <td>{{ "{:,.0f}".format(cit.exp_other) }}</td>
+      </tr>
+      <tr class="total-row">
+        <td>14</td>
+        <td>НИЙТ ХАСАГДАХ ЗАРДАЛ (5+6+7+8+9+10+11+12+13)</td>
+        <td>{{ "{:,.0f}".format(cit.exp_total) }}</td>
+      </tr>
+
+      {# ═══ III. ТАТВАР НОГДОХ ОРЛОГО ═══ #}
+      <tr class="section-head">
+        <td colspan="3">III. ТАТВАР НОГДОХ ОРЛОГЫН ТООЦООЛОЛ</td>
+      </tr>
+      <tr {% if cit.profit_before_tax < 0 %}style="color:#c0392b"{% endif %}>
+        <td>15</td>
+        <td>Татварын өмнөх ашиг / алдагдал (4 – 14)</td>
+        <td>{{ "{:,.0f}".format(cit.profit_before_tax) }}</td>
+      </tr>
+      <tr class="editable">
+        <td>16</td>
+        <td>Нэмэх: Татвар хасагдахгүй зардал
+          <span class="text-muted" style="font-size:0.73rem">(урамшуулал, торгууль гэх мэт)</span></td>
+        <td><input type="number" id="nonDeduct" value="0" oninput="recalc()"
+                   style="width:100%;text-align:right;border:none;background:transparent;font-size:0.85rem;font-family:inherit"></td>
+      </tr>
+      <tr class="editable">
+        <td>17</td>
+        <td>Хасах: Татвараас чөлөөлөгдсөн орлого
+          <span class="text-muted" style="font-size:0.73rem">(засгийн газрын бонд гэх мэт)</span></td>
+        <td><input type="number" id="exempt" value="0" oninput="recalc()"
+                   style="width:100%;text-align:right;border:none;background:transparent;font-size:0.85rem;font-family:inherit"></td>
+      </tr>
+      <tr class="grand-total">
+        <td>18</td>
+        <td>ТАТВАР НОГДОХ ОРЛОГО (15 + 16 – 17)</td>
+        <td id="taxableIncome">{{ "{:,.0f}".format(cit.taxable_income) }}</td>
+      </tr>
+
+      {# ═══ IV. ТАТВАРЫН ТООЦООЛОЛ ═══ #}
+      <tr class="section-head">
+        <td colspan="3">IV. ТАТВАРЫН ТООЦООЛОЛ</td>
+      </tr>
+      <tr>
+        <td>19а</td>
+        <td>3,000,000,000₮ хүртэлх орлогод ногдох татвар (× 10%)
+          <span class="text-muted" style="font-size:0.73rem">
+            Суурь: <span id="baseLow">{{ "{:,.0f}".format(cit.tax_base_low) }}</span>₮
+          </span></td>
+        <td id="taxLow">{{ "{:,.0f}".format(cit.tax_base_low * 0.10) }}</td>
+      </tr>
+      <tr>
+        <td>19б</td>
+        <td>3,000,000,000₮-с давсан орлогод ногдох татвар (× 25%)
+          <span class="text-muted" style="font-size:0.73rem">
+            Суурь: <span id="baseHigh">{{ "{:,.0f}".format(cit.tax_base_high) }}</span>₮
+          </span></td>
+        <td id="taxHigh">{{ "{:,.0f}".format(cit.tax_base_high * 0.25) }}</td>
+      </tr>
+      <tr class="total-row">
+        <td>20</td>
+        <td>Тооцоолсон татвар нийт (19а + 19б)</td>
+        <td id="taxCalc">{{ "{:,.0f}".format(cit.tax_calculated) }}</td>
+      </tr>
+      <tr class="editable">
+        <td>21</td>
+        <td>Хасах: Татварын хөнгөлөлт, чөлөөлөлт
+          <span class="text-muted" style="font-size:0.73rem">(гарааны компани, чөлөөт бүс гэх мэт)</span></td>
+        <td><input type="number" id="taxRelief" value="0" oninput="recalc()"
+                   style="width:100%;text-align:right;border:none;background:transparent;font-size:0.85rem;font-family:inherit"></td>
+      </tr>
+      <tr class="grand-total">
+        <td>22</td>
+        <td>ТӨЛБӨЛ ЗОХИХ ТАТВАР (20 – 21)</td>
+        <td id="taxDue">{{ "{:,.0f}".format(cit.tax_due) }}</td>
+      </tr>
+
+      {# ═══ V. УРЬДЧИЛГАА ТӨЛБӨР ═══ #}
+      <tr class="section-head">
+        <td colspan="3">V. УРЬДЧИЛГАА ТӨЛБӨР</td>
+      </tr>
+      <tr class="editable">
+        <td>23а</td>
+        <td>1-р улиралд төлсөн урьдчилгаа</td>
+        <td><input type="number" id="adv1" value="0" oninput="recalc()"
+                   style="width:100%;text-align:right;border:none;background:transparent;font-size:0.85rem;font-family:inherit"></td>
+      </tr>
+      <tr class="editable">
+        <td>23б</td>
+        <td>2-р улиралд төлсөн урьдчилгаа</td>
+        <td><input type="number" id="adv2" value="0" oninput="recalc()"
+                   style="width:100%;text-align:right;border:none;background:transparent;font-size:0.85rem;font-family:inherit"></td>
+      </tr>
+      <tr class="editable">
+        <td>23в</td>
+        <td>3-р улиралд төлсөн урьдчилгаа</td>
+        <td><input type="number" id="adv3" value="0" oninput="recalc()"
+                   style="width:100%;text-align:right;border:none;background:transparent;font-size:0.85rem;font-family:inherit"></td>
+      </tr>
+      <tr class="editable">
+        <td>23г</td>
+        <td>4-р улиралд төлсөн урьдчилгаа</td>
+        <td><input type="number" id="adv4" value="0" oninput="recalc()"
+                   style="width:100%;text-align:right;border:none;background:transparent;font-size:0.85rem;font-family:inherit"></td>
+      </tr>
+      <tr class="total-row">
+        <td>24</td>
+        <td>НИЙТ УРЬДЧИЛГАА ТӨЛБӨР (23а+23б+23в+23г)</td>
+        <td id="advTotal">{{ "{:,.0f}".format(cit.advance_paid) }}</td>
+      </tr>
+
+      {# ═══ VI. ДҮГНЭЛТ ═══ #}
+      <tr class="section-head">
+        <td colspan="3">VI. ДҮГНЭЛТ</td>
+      </tr>
+      <tr id="rowPayable" {% if cit.net_refund > 0 %}style="display:none"{% endif %}>
+        <td>25</td>
+        <td style="font-weight:bold;color:#c0392b">
+          <i class="fas fa-arrow-up me-1"></i>НЭМЖ ТӨЛӨХ ТАТВАР (22 – 24)
+          <span class="text-muted fw-normal" style="font-size:0.73rem">— дараа оны 2 сарын 10-ны дотор</span>
+        </td>
+        <td id="netPayable" style="font-weight:bold;color:#c0392b">
+          {{ "{:,.0f}".format(cit.net_payable) }}</td>
+      </tr>
+      <tr id="rowRefund" {% if cit.net_payable > 0 %}style="display:none"{% endif %}>
+        <td>26</td>
+        <td style="font-weight:bold;color:#27ae60">
+          <i class="fas fa-arrow-down me-1"></i>БУЦААН ОЛГОХ ТАТВАР (24 – 22)
+        </td>
+        <td id="netRefund" style="font-weight:bold;color:#27ae60">
+          {{ "{:,.0f}".format(cit.net_refund) }}</td>
+      </tr>
+    </tbody>
+  </table>
+
+  {# ── Татварын хувь тайлбар ── #}
+  <div class="no-print">
+    <div class="alert alert-info py-2 small mb-3" style="font-size:0.8rem">
+      <i class="fas fa-info-circle me-1"></i>
+      <strong>ААНОАТ-ын хувь хэмжээ (ААНОАТ-ын тухай хуулийн 14-р зүйл):</strong>
+      3,000,000,000₮ хүртэл — <strong>10%</strong> |
+      3,000,000,000₮-с давсан хэсэгт — <strong>25%</strong> |
+      Ногдол ашиг, хүү, эрхийн шимтгэл — <strong>10%</strong> |
+      Үл хөдлөх хөрөнгө борлуулалт — <strong>2%</strong> |
+      Жилийн тайланг дараа оны <strong>2 сарын 10</strong>-ны дотор өгнө
+    </div>
+  </div>
+
+  {# ── Гарын үсэг ── #}
+  <div class="cit-signature">
+    <div>
+      <div class="sig-box">
+        <div>Тайлан гаргасан нягтлан бодогч</div>
+        <div class="text-muted" style="font-size:0.75rem;margin-top:4px">Нэр, гарын үсэг, тамга</div>
+      </div>
+    </div>
+    <div>
+      <div class="sig-box">
+        <div>Захирал / Эрх бүхий этгээд</div>
+        <div class="text-muted" style="font-size:0.75rem;margin-top:4px">Нэр, гарын үсэг, тамга</div>
+      </div>
+    </div>
+    <div>
+      <div class="sig-box">
+        <div>Татварын байцаагч хүлээн авсан</div>
+        <div class="text-muted" style="font-size:0.75rem;margin-top:4px">Нэр, гарын үсэг, огноо</div>
+      </div>
+    </div>
+  </div>
+
+</div>{# /cit-wrap #}
+
+{% block scripts %}
+<script>
+const PROFIT_BEFORE = {{ cit.profit_before_tax }};
+const THRESHOLD = 3000000000;
+
+function fmt(n) {
+  if (isNaN(n) || n === 0) return '—';
+  return new Intl.NumberFormat('mn-MN').format(Math.round(n));
+}
+
+function recalc() {
+  const nonDeduct = parseFloat(document.getElementById('nonDeduct').value) || 0;
+  const exempt    = parseFloat(document.getElementById('exempt').value)    || 0;
+  const relief    = parseFloat(document.getElementById('taxRelief').value) || 0;
+  const adv1 = parseFloat(document.getElementById('adv1').value) || 0;
+  const adv2 = parseFloat(document.getElementById('adv2').value) || 0;
+  const adv3 = parseFloat(document.getElementById('adv3').value) || 0;
+  const adv4 = parseFloat(document.getElementById('adv4').value) || 0;
+
+  // Татвар ногдох орлого
+  const taxable = PROFIT_BEFORE + nonDeduct - exempt;
+  document.getElementById('taxableIncome').textContent = fmt(taxable);
+
+  // Татварын тооцоолол
+  let baseLow = 0, baseHigh = 0, taxCalc = 0;
+  if (taxable > 0) {
+    baseLow  = Math.min(taxable, THRESHOLD);
+    baseHigh = Math.max(0, taxable - THRESHOLD);
+    taxCalc  = baseLow * 0.10 + baseHigh * 0.25;
+  }
+  document.getElementById('baseLow').textContent  = fmt(baseLow);
+  document.getElementById('baseHigh').textContent = fmt(baseHigh);
+  document.getElementById('taxLow').textContent   = fmt(baseLow * 0.10);
+  document.getElementById('taxHigh').textContent  = fmt(baseHigh * 0.25);
+  document.getElementById('taxCalc').textContent  = fmt(taxCalc);
+
+  const taxDue = Math.max(0, taxCalc - relief);
+  document.getElementById('taxDue').textContent = fmt(taxDue);
+
+  // Урьдчилгаа
+  const advTotal = adv1 + adv2 + adv3 + adv4;
+  document.getElementById('advTotal').textContent = fmt(advTotal);
+
+  // Дүгнэлт
+  const net = taxDue - advTotal;
+  if (net > 0) {
+    document.getElementById('rowPayable').style.display = '';
+    document.getElementById('rowRefund').style.display  = 'none';
+    document.getElementById('netPayable').textContent   = fmt(net);
+  } else {
+    document.getElementById('rowPayable').style.display = 'none';
+    document.getElementById('rowRefund').style.display  = '';
+    document.getElementById('netRefund').textContent    = fmt(-net);
+  }
+}
+</script>
+{% endblock %}
+{% endblock %}

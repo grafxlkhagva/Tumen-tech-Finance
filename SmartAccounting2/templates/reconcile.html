@@ -1,0 +1,432 @@
+{% extends "base.html" %}
+{% block title %}Тулгалт — {{ partner.name }}{% endblock %}
+{% block page_title %}Тулгалт — {{ partner.name }}{% endblock %}
+
+{% block topbar_actions %}
+<a href="{{ url_for('payables') }}" class="btn btn-outline-secondary btn-sm me-2">
+  <i class="fas fa-arrow-left me-1"></i>Буцах
+</a>
+<button id="btnAutoMatch" class="btn btn-success btn-sm me-2">
+  <i class="fas fa-magic me-1"></i>Автоматаар тулгах
+</button>
+{% endblock %}
+
+{% block content %}
+
+{# ── Товч мэдээлэл ── #}
+<div class="row g-3 mb-3">
+  <div class="col-md-3">
+    <div class="stat-card bg-red" style="padding:14px">
+      <h6 style="font-size:0.75rem">Нийт нэхэмжлэл</h6>
+      <h3 class="num mb-0" style="font-size:1.2rem">{{ "{:,.0f}".format(total_inv) }}₮</h3>
+      <small style="opacity:.8">{{ invoices|length }} баримт</small>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="stat-card bg-blue" style="padding:14px">
+      <h6 style="font-size:0.75rem">Нийт төлбөр</h6>
+      <h3 class="num mb-0" style="font-size:1.2rem">{{ "{:,.0f}".format(total_pay) }}₮</h3>
+      <small style="opacity:.8">{{ payments|length }} гүйлгээ</small>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="stat-card bg-green" style="padding:14px">
+      <h6 style="font-size:0.75rem">Тулгасан дүн</h6>
+      <h3 class="num mb-0" style="font-size:1.2rem">{{ "{:,.0f}".format(total_recon) }}₮</h3>
+      <small style="opacity:.8">{{ recons|length }} тулгалт</small>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="stat-card {{ 'bg-orange' if (total_inv - total_pay)|abs > 1 else 'bg-green' }}" style="padding:14px">
+      <h6 style="font-size:0.75rem">Зөрүү</h6>
+      <h3 class="num mb-0" style="font-size:1.2rem">{{ "{:,.0f}".format(total_inv - total_pay) }}₮</h3>
+      <small style="opacity:.8">Нэхэмжлэл − Төлбөр</small>
+    </div>
+  </div>
+</div>
+
+{# ── Заавар ── #}
+<div class="alert alert-info py-2 px-3 small no-print mb-3">
+  <i class="fas fa-info-circle me-1"></i>
+  <strong>Хэрхэн ашиглах:</strong>
+  Нэхэмжлэлийн картыг чирж (drag) баруун талын төлбөрийн карт дээр тавина уу → тулгалт үүснэ.
+  Дүн таарч байвал автоматаар тулгагдана. Зөрүүтэй бол журналын бичилт үүсгэх боломжтой.
+</div>
+
+{# ══════════════════════════════════════════════════════════════ #}
+{# ── Тулгаагүй гүйлгээ (Drag & Drop zone) ── #}
+{# ══════════════════════════════════════════════════════════════ #}
+<div class="card mb-3">
+  <div class="card-header d-flex justify-content-between align-items-center py-2">
+    <span class="fw-semibold"><i class="fas fa-exchange-alt me-2 text-primary"></i>Тулгаагүй гүйлгээ</span>
+    <span class="badge bg-secondary">
+      {{ unmatched_inv|length }} нэхэмжлэл &nbsp;|&nbsp; {{ unmatched_pay|length }} төлбөр
+    </span>
+  </div>
+  <div class="card-body p-0">
+    <div class="row g-0">
+
+      {# ── Нэхэмжлэлүүд (зүүн) ── #}
+      <div class="col-md-6" style="border-right:2px dashed #dee2e6">
+        <div class="p-2 text-center small fw-semibold text-danger"
+             style="background:#fce4ec;border-bottom:1px solid #f8bbd0">
+          <i class="fas fa-file-invoice me-1"></i>E-Бариmt нэхэмжлэл
+          <span class="badge bg-danger ms-1">{{ unmatched_inv|length }}</span>
+        </div>
+        <div id="invoiceList" class="p-2" style="min-height:120px">
+          {% if not unmatched_inv %}
+          <div class="text-center text-muted py-4 small">
+            <i class="fas fa-check-circle fa-2x text-success d-block mb-2"></i>Бүгд тулгагдсан
+          </div>
+          {% endif %}
+          {% for v in unmatched_inv %}
+          <div class="recon-card invoice-card"
+               draggable="true"
+               data-id="{{ v.id }}"
+               data-amount="{{ v.total_amount or 0 }}"
+               data-label="{{ v.date.strftime('%Y-%m-%d') if v.date else '' }} — {{ '{:,.0f}'.format(v.total_amount or 0) }}₮">
+            <div class="d-flex justify-content-between align-items-start">
+              <div>
+                <div class="fw-semibold" style="font-size:0.8rem">
+                  {{ v.date.strftime('%Y-%m-%d') if v.date else '—' }}
+                </div>
+                <div class="text-muted" style="font-size:0.72rem">
+                  {{ v.ddtd or v.invoice_no or '—' }}
+                </div>
+              </div>
+              <div class="text-end">
+                <div class="fw-bold text-danger num" style="font-size:0.85rem">
+                  {{ "{:,.0f}".format(v.total_amount or 0) }}₮
+                </div>
+                <div class="text-muted" style="font-size:0.68rem">
+                  НӨАТ: {{ "{:,.0f}".format(v.vat_amount or 0) }}
+                </div>
+              </div>
+            </div>
+            <div class="drag-hint text-muted" style="font-size:0.65rem;margin-top:3px">
+              <i class="fas fa-grip-lines me-1"></i>чирж баруун тийш тавина уу
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+
+      {# ── Банкны төлбөр (баруун) ── #}
+      <div class="col-md-6">
+        <div class="p-2 text-center small fw-semibold text-success"
+             style="background:#e8f5e9;border-bottom:1px solid #c8e6c9">
+          <i class="fas fa-university me-1"></i>Банкны зарлага
+          <span class="badge bg-success ms-1">{{ unmatched_pay|length }}</span>
+        </div>
+        <div id="paymentList" class="p-2" style="min-height:120px">
+          {% if not unmatched_pay %}
+          <div class="text-center text-muted py-4 small">
+            <i class="fas fa-check-circle fa-2x text-success d-block mb-2"></i>Бүгд тулгагдсан
+          </div>
+          {% endif %}
+          {% for c in unmatched_pay %}
+          <div class="recon-card payment-card drop-target"
+               data-id="{{ c.id }}"
+               data-amount="{{ c.expense or 0 }}"
+               data-label="{{ c.date.strftime('%Y-%m-%d') if c.date else '' }} — {{ '{:,.0f}'.format(c.expense or 0) }}₮">
+            <div class="d-flex justify-content-between align-items-start">
+              <div style="flex:1;min-width:0">
+                <div class="fw-semibold" style="font-size:0.8rem">
+                  {{ c.date.strftime('%Y-%m-%d') if c.date else '—' }}
+                </div>
+                <div class="text-muted" style="font-size:0.72rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"
+                     title="{{ c.description }}">
+                  {{ c.description[:60] if c.description else '—' }}
+                </div>
+                <div class="text-muted" style="font-size:0.68rem">{{ c.bank or '' }}</div>
+              </div>
+              <div class="text-end ms-2">
+                <div class="fw-bold text-success num" style="font-size:0.85rem">
+                  {{ "{:,.0f}".format(c.expense or 0) }}₮
+                </div>
+              </div>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+{# ══════════════════════════════════════════════════════════════ #}
+{# ── Тулгасан хосууд ── #}
+{# ══════════════════════════════════════════════════════════════ #}
+{% if recons %}
+<div class="card">
+  <div class="card-header py-2">
+    <span class="fw-semibold text-success">
+      <i class="fas fa-check-double me-2"></i>Тулгасан гүйлгээ
+    </span>
+    <span class="badge bg-success ms-2">{{ recons|length }}</span>
+  </div>
+  <div class="card-body p-0">
+    <table class="table table-sm mb-0" style="font-size:0.8rem">
+      <thead style="background:#e8f5e9">
+        <tr>
+          <th>Нэхэмжлэл</th>
+          <th class="text-end">Нэхэмжлэлийн дүн</th>
+          <th>Банкны зарлага</th>
+          <th class="text-end">Төлбөрийн дүн</th>
+          <th class="text-end">Тулгасан</th>
+          <th class="text-end">Зөрүү</th>
+          <th style="width:40px"></th>
+        </tr>
+      </thead>
+      <tbody id="reconList">
+        {% for r in recons %}
+        <tr id="recon-{{ r.id }}">
+          <td>
+            {% if r.vat_record %}
+              <span class="font-monospace text-muted" style="font-size:0.72rem">
+                {{ r.vat_record.date.strftime('%Y-%m-%d') if r.vat_record.date else '—' }}
+              </span>
+              <br><span class="text-muted small">{{ r.vat_record.ddtd or r.vat_record.invoice_no or '—' }}</span>
+            {% else %}<span class="text-muted">—</span>{% endif %}
+          </td>
+          <td class="text-end num text-danger">
+            {% if r.vat_record %}{{ "{:,.0f}".format(r.vat_record.total_amount or 0) }}₮{% else %}—{% endif %}
+          </td>
+          <td>
+            {% if r.cash_txn %}
+              <span class="font-monospace text-muted" style="font-size:0.72rem">
+                {{ r.cash_txn.date.strftime('%Y-%m-%d') if r.cash_txn.date else '—' }}
+              </span>
+              <br><span class="text-muted small" title="{{ r.cash_txn.description }}">
+                {{ (r.cash_txn.description or '')[:50] }}
+              </span>
+            {% else %}<span class="text-muted">—</span>{% endif %}
+          </td>
+          <td class="text-end num text-success">
+            {% if r.cash_txn %}{{ "{:,.0f}".format(r.cash_txn.expense or 0) }}₮{% else %}—{% endif %}
+          </td>
+          <td class="text-end num fw-semibold">{{ "{:,.0f}".format(r.matched_amount) }}₮</td>
+          <td class="text-end num {{ 'text-danger' if r.diff > 0.5 else ('text-primary' if r.diff < -0.5 else 'text-success') }}">
+            {% if r.diff|abs < 1 %}
+              <i class="fas fa-check text-success"></i>
+            {% elif r.diff > 0 %}
+              {{ "{:,.0f}".format(r.diff) }}₮
+            {% else %}
+              +{{ "{:,.0f}".format(-r.diff) }}₮
+            {% endif %}
+            {% if r.notes %}<br><small class="text-muted">{{ r.notes }}</small>{% endif %}
+          </td>
+          <td class="text-center">
+            <button class="btn btn-outline-danger btn-sm py-0 px-1"
+                    onclick="deleteRecon({{ r.id }})" title="Устгах" style="font-size:0.7rem">
+              <i class="fas fa-times"></i>
+            </button>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+
+{# ── Зөрүүгийн журнал modal ── #}
+<div class="modal fade" id="diffModal" tabindex="-1">
+  <div class="modal-dialog modal-sm">
+    <div class="modal-content">
+      <div class="modal-header py-2" style="background:#1565C0;color:#fff">
+        <h6 class="modal-title mb-0"><i class="fas fa-exclamation-triangle me-2"></i>Зөрүүтэй тулгалт</h6>
+        <button type="button" class="btn-close btn-close-white btn-sm" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body py-3">
+        <div class="mb-2 small text-muted">Нэхэмжлэл болон төлбөрийн дүн зөрж байна:</div>
+        <div class="d-flex gap-3 mb-3 text-center">
+          <div class="flex-fill p-2 rounded" style="background:#fce4ec">
+            <div class="small text-muted">Нэхэмжлэл</div>
+            <div class="fw-bold text-danger num" id="diffInvAmt"></div>
+          </div>
+          <div class="d-flex align-items-center"><i class="fas fa-arrows-alt-h text-muted"></i></div>
+          <div class="flex-fill p-2 rounded" style="background:#e8f5e9">
+            <div class="small text-muted">Төлбөр</div>
+            <div class="fw-bold text-success num" id="diffPayAmt"></div>
+          </div>
+        </div>
+        <div class="alert alert-warning py-2 small mb-3">
+          <strong>Зөрүү: <span id="diffAmt" class="num"></span>₮</strong>
+        </div>
+        <div class="mb-2">
+          <label class="form-label small fw-semibold">Тэмдэглэл</label>
+          <input type="text" id="diffNotes" class="form-control form-control-sm"
+                 placeholder="Жишээ: Банкны шимтгэл, хөнгөлөлт...">
+        </div>
+        <div class="form-check mb-2">
+          <input class="form-check-input" type="checkbox" id="createJournal">
+          <label class="form-check-label small" for="createJournal">
+            Зөрүүгийн журналын бичилт автоматаар үүсгэх
+          </label>
+        </div>
+      </div>
+      <div class="modal-footer py-2">
+        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Болих</button>
+        <button type="button" class="btn btn-primary btn-sm" id="confirmMatch">
+          <i class="fas fa-link me-1"></i>Тулгах
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<style>
+.recon-card {
+  border: 1px solid #dee2e6;
+  border-radius: 8px;
+  padding: 8px 10px;
+  margin-bottom: 6px;
+  background: #fff;
+  cursor: grab;
+  transition: all 0.15s;
+  user-select: none;
+}
+.invoice-card { border-left: 3px solid #e53935; }
+.payment-card { border-left: 3px solid #43a047; }
+.recon-card:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.12); transform: translateY(-1px); }
+.recon-card.dragging { opacity: 0.4; transform: scale(0.97); }
+.recon-card.drag-over {
+  border: 2px dashed #1976D2 !important;
+  background: #e3f2fd !important;
+  transform: scale(1.02);
+}
+.drop-target { cursor: default; }
+.drag-hint { display: block; }
+.recon-card.dragging .drag-hint { display: none; }
+</style>
+
+<script>
+const PARTNER_ID = {{ partner.id }};
+let dragInvId = null, dragInvAmt = 0, dragInvLabel = '';
+let pendingInvId = null, pendingPayId = null;
+const diffModal = new bootstrap.Modal(document.getElementById('diffModal'));
+
+// ── Drag events on invoices ────────────────────────────────────
+document.querySelectorAll('.invoice-card[draggable]').forEach(card => {
+  card.addEventListener('dragstart', e => {
+    dragInvId    = card.dataset.id;
+    dragInvAmt   = parseFloat(card.dataset.amount);
+    dragInvLabel = card.dataset.label;
+    card.classList.add('dragging');
+    e.dataTransfer.effectAllowed = 'move';
+  });
+  card.addEventListener('dragend', () => card.classList.remove('dragging'));
+});
+
+// ── Drop events on payments ────────────────────────────────────
+document.querySelectorAll('.payment-card.drop-target').forEach(card => {
+  card.addEventListener('dragover', e => { e.preventDefault(); card.classList.add('drag-over'); });
+  card.addEventListener('dragleave', () => card.classList.remove('drag-over'));
+  card.addEventListener('drop', e => {
+    e.preventDefault();
+    card.classList.remove('drag-over');
+    if (!dragInvId) return;
+
+    const payId  = card.dataset.id;
+    const payAmt = parseFloat(card.dataset.amount);
+    const diff   = dragInvAmt - payAmt;
+
+    if (Math.abs(diff) < 1) {
+      // Яг тохирч байна → шууд тулгана
+      doMatch(dragInvId, payId, false, '');
+    } else {
+      // Зөрүүтэй → modal харуулна
+      pendingInvId = dragInvId;
+      pendingPayId = payId;
+      document.getElementById('diffInvAmt').textContent = fmt(dragInvAmt) + '₮';
+      document.getElementById('diffPayAmt').textContent = fmt(payAmt) + '₮';
+      document.getElementById('diffAmt').textContent    = fmt(Math.abs(diff));
+      document.getElementById('diffNotes').value = '';
+      document.getElementById('createJournal').checked = Math.abs(diff) < dragInvAmt * 0.05;
+      diffModal.show();
+    }
+  });
+});
+
+// ── Modal confirm ──────────────────────────────────────────────
+document.getElementById('confirmMatch').addEventListener('click', () => {
+  if (!pendingInvId || !pendingPayId) return;
+  const notes = document.getElementById('diffNotes').value;
+  const createJE = document.getElementById('createJournal').checked;
+  diffModal.hide();
+  doMatch(pendingInvId, pendingPayId, createJE, notes);
+  pendingInvId = pendingPayId = null;
+});
+
+// ── Auto-match button ──────────────────────────────────────────
+document.getElementById('btnAutoMatch').addEventListener('click', async () => {
+  const btn = document.getElementById('btnAutoMatch');
+  btn.disabled = true;
+  btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Тулгаж байна...';
+  const res  = await fetch('/api/reconcile/auto-match', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({partner_id: PARTNER_ID})
+  });
+  const data = await res.json();
+  if (data.ok) {
+    showToast(`${data.created} тулгалт үүслээ`, 'success');
+    setTimeout(() => location.reload(), 800);
+  }
+});
+
+// ── Тулгалт устгах ────────────────────────────────────────────
+async function deleteRecon(id) {
+  if (!confirm('Тулгалт устгах уу?')) return;
+  const res = await fetch(`/api/reconcile/${id}`, {method:'DELETE'});
+  const data = await res.json();
+  if (data.ok) {
+    document.getElementById(`recon-${id}`)?.remove();
+    showToast('Тулгалт устгагдлаа', 'warning');
+    setTimeout(() => location.reload(), 600);
+  }
+}
+
+// ── Core match function ────────────────────────────────────────
+async function doMatch(invId, payId, createJournal, notes) {
+  const res = await fetch('/api/reconcile/match', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({
+      partner_id: PARTNER_ID,
+      invoice_id: parseInt(invId),
+      payment_id: parseInt(payId),
+      create_journal: createJournal,
+      notes: notes
+    })
+  });
+  const data = await res.json();
+  if (data.ok) {
+    const diff = data.diff;
+    const msg  = Math.abs(diff) < 1
+      ? 'Тулгалт амжилттай — яг тохирлоо ✓'
+      : `Тулгалт үүслээ. Зөрүү: ${fmt(Math.abs(diff))}₮${createJournal ? ' (журнал бичигдлээ)' : ''}`;
+    showToast(msg, Math.abs(diff) < 1 ? 'success' : 'warning');
+    setTimeout(() => location.reload(), 900);
+  }
+}
+
+// ── Helpers ────────────────────────────────────────────────────
+function fmt(n) {
+  return Number(n).toLocaleString('mn-MN', {maximumFractionDigits:0});
+}
+function showToast(msg, type) {
+  const t = document.createElement('div');
+  t.className = `alert alert-${type} position-fixed bottom-0 end-0 m-3 shadow`;
+  t.style.cssText = 'z-index:9999;min-width:260px;font-size:0.85rem';
+  t.innerHTML = `<i class="fas fa-${type==='success'?'check-circle':'exclamation-circle'} me-2"></i>${msg}`;
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 3000);
+}
+</script>
+{% endblock %}

@@ -1,0 +1,283 @@
+{% extends "base.html" %}
+{% block title %}Нэхэмжлэхийн тайлан{% endblock %}
+{% block page_title %}Нэхэмжлэхийн тайлан — {{ company.name }}{% endblock %}
+
+{% block topbar_actions %}
+<a href="{{ url_for('add_receivable') }}" class="btn btn-primary btn-sm me-2 no-print">
+    <i class="fas fa-plus me-1"></i>Нэхэмжлэх нэмэх
+</a>
+<button onclick="window.print()" class="btn btn-outline-secondary btn-sm no-print">
+    <i class="fas fa-print me-1"></i>Хэвлэх
+</button>
+{% endblock %}
+
+{% block content %}
+
+{# ── Stat cards ── #}
+<div class="row g-3 mb-3 no-print">
+  <div class="col-md-3">
+    <div class="stat-card bg-blue">
+      <i class="fas fa-file-invoice icon"></i>
+      <h6>Нийт нэхэмжилсэн</h6>
+      <h2 class="num">{{ "{:,.0f}".format(total_amt) }}₮</h2>
+      <small style="opacity:.8">{{ open_cnt + partial_cnt + paid_cnt }} нэхэмжлэл</small>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="stat-card bg-green">
+      <i class="fas fa-check-circle icon"></i>
+      <h6>Цугласан</h6>
+      <h2 class="num">{{ "{:,.0f}".format(total_paid) }}₮</h2>
+      <small style="opacity:.8">{{ paid_cnt }} бүрэн төлөгдсөн</small>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="stat-card bg-orange">
+      <i class="fas fa-clock icon"></i>
+      <h6>Үлдэгдэл авлага</h6>
+      <h2 class="num">{{ "{:,.0f}".format(total_remaining) }}₮</h2>
+      <small style="opacity:.8">{{ open_cnt + partial_cnt }} нэхэмжлэл</small>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="stat-card" style="background:linear-gradient(135deg,#4527a0,#7b1fa2)">
+      <i class="fas fa-percentage icon"></i>
+      <h6>Цуглуулалтын хувь</h6>
+      {% set pct = (total_paid / total_amt * 100) if total_amt > 0 else 0 %}
+      <h2>{{ "{:.1f}".format(pct) }}%</h2>
+      <small style="opacity:.8">&nbsp;</small>
+    </div>
+  </div>
+</div>
+
+{# ── Шүүлт + хайлт ── #}
+<div class="card mb-3 no-print">
+  <div class="card-body py-2 px-3">
+    <form method="get" class="d-flex flex-wrap gap-2 align-items-center">
+      {# Төлөв #}
+      <div class="btn-group btn-group-sm">
+        <a href="{{ url_for('invoice_list', month=sel_month, q=search) }}"
+           class="btn btn-outline-secondary {{ 'active' if not sel_status }}">
+          Бүгд <span class="badge bg-secondary ms-1">{{ open_cnt+partial_cnt+paid_cnt }}</span>
+        </a>
+        <a href="{{ url_for('invoice_list', status='open', month=sel_month, q=search) }}"
+           class="btn btn-outline-danger {{ 'active' if sel_status=='open' }}">
+          Нээлттэй <span class="badge bg-danger ms-1">{{ open_cnt }}</span>
+        </a>
+        <a href="{{ url_for('invoice_list', status='partial', month=sel_month, q=search) }}"
+           class="btn btn-outline-warning {{ 'active' if sel_status=='partial' }}">
+          Хэсэгчлэн <span class="badge bg-warning text-dark ms-1">{{ partial_cnt }}</span>
+        </a>
+        <a href="{{ url_for('invoice_list', status='paid', month=sel_month, q=search) }}"
+           class="btn btn-outline-success {{ 'active' if sel_status=='paid' }}">
+          Төлөгдсөн <span class="badge bg-success ms-1">{{ paid_cnt }}</span>
+        </a>
+      </div>
+
+      {# Сар шүүлт #}
+      <select name="month" class="form-select form-select-sm" style="width:110px"
+              onchange="this.form.submit()">
+        <option value="">Бүх сар</option>
+        {% for m in range(1,13) %}
+        <option value="{{ m }}" {{ 'selected' if sel_month == m|string }}>{{ m }}-р сар</option>
+        {% endfor %}
+      </select>
+
+      {# Хайлт #}
+      <div class="input-group input-group-sm" style="width:220px">
+        <input type="text" name="q" class="form-control" placeholder="Нэхэмж # эсвэл харилцагч..."
+               value="{{ search }}">
+        <button class="btn btn-outline-secondary" type="submit"><i class="fas fa-search"></i></button>
+        {% if search %}<a href="{{ url_for('invoice_list', status=sel_status, month=sel_month) }}"
+           class="btn btn-outline-danger"><i class="fas fa-times"></i></a>{% endif %}
+      </div>
+
+      <input type="hidden" name="status" value="{{ sel_status }}">
+    </form>
+  </div>
+</div>
+
+{# ── Нэхэмжлэхийн жагсаалт ── #}
+<div class="card">
+  <div class="card-header d-flex align-items-center py-2">
+    <i class="fas fa-list me-2"></i>
+    <span class="fw-semibold">Нэхэмжлэхийн жагсаалт</span>
+    <span class="badge bg-primary ms-2">{{ invs|length }}</span>
+    <span class="ms-auto text-muted small no-print">{{ now.strftime('%Y-%m-%d') }} байдлаар</span>
+  </div>
+  <div class="card-body p-0">
+    <table class="table table-hover table-sm mb-0" id="inv-table" style="font-size:0.82rem">
+      <thead class="table-dark">
+        <tr>
+          <th style="width:36px" class="text-center">№</th>
+          <th style="width:110px">Нэхэмж №</th>
+          <th style="width:90px">Огноо</th>
+          <th>Харилцагч</th>
+          <th style="width:90px" class="d-none d-md-table-cell">Хариуцагч</th>
+          <th style="width:180px" class="d-none d-md-table-cell">Тайлбар</th>
+          <th style="width:90px">Хугацаа</th>
+          <th class="text-end" style="width:120px">Нийт дүн</th>
+          <th class="text-end" style="width:110px">Төлсөн</th>
+          <th class="text-end" style="width:110px">Үлдэгдэл</th>
+          <th style="width:80px">Төлөв</th>
+          <th style="width:50px" class="no-print"></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in invs %}
+        {% set pct = (r.paid_amount / r.amount * 100) if r.amount > 0 else 0 %}
+        {% set overdue = r.due_date and r.due_date < now.date() and r.status != 'paid' %}
+        <tr class="{{ 'table-danger' if overdue else '' }}">
+          <td class="text-center text-muted" style="font-size:.75rem">{{ loop.index }}</td>
+          <td>
+            <a href="{{ url_for('form_t1', rec=r.id) }}"
+               class="text-decoration-none fw-bold font-monospace"
+               title="Т-1 маягт харах / хэвлэх">
+              {{ r.invoice_no or '—' }}
+            </a>
+          </td>
+          <td class="text-muted">{{ r.date.strftime('%Y-%m-%d') if r.date else '—' }}</td>
+          <td class="fw-semibold">
+            {{ r.partner.name if r.partner else '—' }}
+          </td>
+          <td class="text-muted d-none d-md-table-cell" style="max-width:90px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+            {{ r.responsible or '—' }}
+          </td>
+          <td class="text-muted d-none d-md-table-cell" style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"
+              title="{{ r.description or '' }}">
+            {{ r.description[:60] if r.description else '—' }}
+          </td>
+          <td class="{{ 'text-danger fw-semibold' if overdue else 'text-muted' }}">
+            {% if r.due_date %}{{ r.due_date.strftime('%m-%d') }}{% if overdue %} ⚠{% endif %}{% else %}—{% endif %}
+          </td>
+          <td class="text-end num">{{ "{:,.0f}".format(r.amount) }}</td>
+          <td class="text-end num text-success">
+            {{ "{:,.0f}".format(r.paid_amount) if r.paid_amount > 0 else '—' }}
+          </td>
+          <td class="text-end num fw-bold {{ 'text-danger' if r.remaining > 0 else 'text-muted' }}">
+            {% if r.remaining > 0 %}{{ "{:,.0f}".format(r.remaining) }}{% else %}—{% endif %}
+          </td>
+          <td>
+            <div style="display:flex;flex-direction:column;gap:2px">
+              {% if r.status == 'paid' %}
+                <span class="badge bg-success" style="font-size:.68rem">Төлөгдсөн</span>
+              {% elif r.status == 'partial' %}
+                <span class="badge bg-warning text-dark" style="font-size:.68rem">Хэсэгчлэн</span>
+                <div class="progress" style="height:3px;border-radius:2px">
+                  <div class="progress-bar bg-warning" style="width:{{ pct|round(0) }}%"></div>
+                </div>
+              {% else %}
+                <span class="badge {{ 'bg-danger' if overdue else 'bg-secondary' }}" style="font-size:.68rem">
+                  {{ 'Хэтэрсэн' if overdue else 'Нээлттэй' }}
+                </span>
+              {% endif %}
+            </div>
+          </td>
+          <td class="no-print">
+            <div class="d-flex gap-1">
+              <a href="{{ url_for('invoice_print', id=r.id) }}" target="_blank"
+                 class="btn btn-outline-success btn-sm"
+                 style="padding:2px 6px;font-size:.7rem;white-space:nowrap"
+                 title="Шинэ загвар">
+                <i class="fas fa-file-invoice me-1"></i>Шинэ
+              </a>
+              <a href="{{ url_for('form_t1', rec=r.id) }}" target="_blank"
+                 class="btn btn-outline-primary btn-sm"
+                 style="padding:2px 6px;font-size:.7rem;white-space:nowrap"
+                 title="Т-1 маягт (хуучин)">
+                <i class="fas fa-print me-1"></i>Т-1
+              </a>
+              <a href="{{ url_for('edit_receivable', id=r.id) }}"
+                 class="btn btn-outline-secondary btn-sm"
+                 style="padding:2px 6px;font-size:.7rem;white-space:nowrap"
+                 title="Засах / KAM оноох">
+                <i class="fas fa-edit"></i>
+              </a>
+            </div>
+          </td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="11" class="text-center py-5 text-muted">
+            <i class="fas fa-file-invoice fa-2x d-block mb-2 opacity-25"></i>
+            Нэхэмжлэл байхгүй байна
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+      {% if invs %}
+      <tfoot class="table-primary fw-bold">
+        <tr>
+          <td colspan="6" class="text-end">Нийт {{ invs|length }} нэхэмжлэл:</td>
+          <td class="text-end num">{{ "{:,.0f}".format(total_amt) }}</td>
+          <td class="text-end num text-success">{{ "{:,.0f}".format(total_paid) }}</td>
+          <td class="text-end num {{ 'text-danger' if total_remaining > 0 else '' }}">
+            {{ "{:,.0f}".format(total_remaining) }}
+          </td>
+          <td colspan="2"></td>
+        </tr>
+      </tfoot>
+      {% endif %}
+    </table>
+  </div>
+</div>
+
+{# ── Сарын нэгтгэл (print-д харагдана) ── #}
+<div class="card mt-3 no-print">
+  <div class="card-header py-2 fw-semibold"><i class="fas fa-chart-bar me-2"></i>Сарын нэгтгэл</div>
+  <div class="card-body p-0">
+    <table class="table table-sm mb-0" style="font-size:.83rem">
+      <thead class="table-light">
+        <tr>
+          <th>Сар</th>
+          <th class="text-end">Тоо</th>
+          <th class="text-end">Нэхэмжилсэн</th>
+          <th class="text-end text-success">Цугласан</th>
+          <th class="text-end text-danger">Үлдэгдэл</th>
+          <th style="width:160px">Хэмжилт</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% set mn = {1:'1-р сар',2:'2-р сар',3:'3-р сар',4:'4-р сар',5:'5-р сар',
+                     6:'6-р сар',7:'7-р сар',8:'8-р сар',9:'9-р сар',
+                     10:'10-р сар',11:'11-р сар',12:'12-р сар'} %}
+        {% for row in monthly %}
+        {% set pct2 = ((row.paid or 0) / (row.amt or 1) * 100) %}
+        {% set remain = [0, (row.amt or 0) - (row.paid or 0)] | max %}
+        <tr>
+          <td class="fw-semibold">{{ mn.get(row.m|int, row.m|string ~ '-р сар') }}</td>
+          <td class="text-end">{{ row.cnt }}</td>
+          <td class="text-end num">{{ "{:,.0f}".format(row.amt or 0) }}</td>
+          <td class="text-end num text-success">{{ "{:,.0f}".format(row.paid or 0) }}</td>
+          <td class="text-end num {{ 'text-danger' if remain > 0 else 'text-muted' }}">
+            {{ "{:,.0f}".format(remain) if remain > 0 else '—' }}
+          </td>
+          <td>
+            <div class="progress" style="height:7px;border-radius:4px">
+              <div class="progress-bar {{ 'bg-success' if pct2 >= 100 else 'bg-primary' }}"
+                   style="width:{{ [pct2,100]|min }}%"></div>
+            </div>
+            <div class="text-muted" style="font-size:.7rem">{{ "{:.0f}".format(pct2) }}%</div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<style>
+@media print {
+  .sidebar,.topbar,.no-print,.content-area>.alert { display:none !important; }
+  .main-content { margin-left:0 !important; }
+  .content-area { padding:4px !important; }
+  .card { border:1px solid #ccc !important; box-shadow:none !important; }
+  .table { font-size:8pt !important; }
+  .badge { font-size:7pt !important; border:1px solid #ccc; }
+  @page { size: A4 landscape; margin:10mm; }
+}
+</style>
+{% endblock %}

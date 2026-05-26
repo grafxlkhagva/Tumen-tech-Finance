@@ -1,0 +1,208 @@
+{% extends "base.html" %}
+{% block title %}{{ journal.number }}{% endblock %}
+{% block page_title %}Гүйлгээний баримт — {{ journal.number }}{% endblock %}
+
+{% block topbar_actions %}
+<a href="{{ url_for('journals') }}" class="btn btn-outline-secondary btn-sm me-2 no-print">
+    <i class="fas fa-arrow-left me-1"></i>Буцах
+</a>
+<button onclick="window.print()" class="btn btn-primary btn-sm me-2 no-print">
+    <i class="fas fa-print me-1"></i>Баримт хэвлэх
+</button>
+{% if journal.status == 'draft' %}
+<form action="{{ url_for('post_journal', id=journal.id) }}" method="post" class="d-inline no-print">
+    <button class="btn btn-success btn-sm" onclick="return confirm('Гүйлгээг баталгаажуулах уу?')">
+        <i class="fas fa-check me-1"></i>Баталгаажуулах
+    </button>
+</form>
+{% endif %}
+{% endblock %}
+
+{% block content %}
+<div class="voucher-wrap">
+
+  <!-- Screen info bar -->
+  <div class="card mb-3 no-print">
+    <div class="card-body py-2 d-flex align-items-center gap-3">
+      {% if journal.status == 'posted' %}
+      <span class="badge badge-posted fs-6"><i class="fas fa-check-circle me-1"></i>Баталгаажсан</span>
+      {% else %}
+      <span class="badge badge-draft fs-6"><i class="fas fa-clock me-1"></i>Ноорог</span>
+      {% endif %}
+      <span class="text-muted small">Бүртгэсэн: {{ journal.created_at.strftime('%Y-%m-%d %H:%M') if journal.created_at else '—' }}</span>
+      <span class="text-muted small ms-auto">Нийт дүн:
+        <strong class="text-primary">{{ "{:,.0f}".format(journal.lines|sum(attribute='amount')) }}₮</strong>
+      </span>
+    </div>
+  </div>
+
+  <!-- ═══ VOUCHER (print + screen) ═══ -->
+  <div class="voucher-box card">
+    <div class="card-body p-4">
+
+      <!-- Header top ref (print only) -->
+      <div class="d-none d-print-flex justify-content-between small text-muted mb-1">
+        <span>{{ company.name }}</span>
+        <span>ТТ-ГБ-{{ now.year }}</span>
+      </div>
+
+      <!-- Voucher title -->
+      <div class="text-center mb-3">
+        <h4 class="fw-bold text-uppercase mb-0" style="letter-spacing:1.5px">Гүйлгээний баримт</h4>
+        <div class="small text-muted">Accounting Journal Voucher</div>
+        <hr class="border-2 border-dark my-2">
+        <div class="row small">
+          <div class="col-4 text-start">
+            <span class="text-muted">Компани:</span>
+            <strong class="ms-1">{{ company.name }}</strong>
+          </div>
+          <div class="col-4 text-center">
+            <span class="text-muted">Дугаар:</span>
+            <strong class="ms-1 font-monospace">{{ journal.number }}</strong>
+          </div>
+          <div class="col-4 text-end">
+            <span class="text-muted">Огноо:</span>
+            <strong class="ms-1">{{ journal.date.strftime('%Y-%m-%d') }}</strong>
+          </div>
+        </div>
+        {% if journal.reference %}
+        <div class="row small mt-1">
+          <div class="col text-center">
+            <span class="text-muted">Лавлагаа:</span>
+            <strong class="ms-1">{{ journal.reference }}</strong>
+          </div>
+        </div>
+        {% endif %}
+      </div>
+
+      {% if journal.description %}
+      <div class="mb-3 px-3 py-2" style="background:#f8f9fa;border-left:3px solid #1976D2;border-radius:4px;">
+        <span class="small text-muted">Тайлбар: </span>{{ journal.description }}
+      </div>
+      {% endif %}
+
+      <!-- ══════ JOURNAL ENTRY TABLE — НББ-ийн бичилт ══════ -->
+      <table class="table table-bordered voucher-table mb-2">
+        <thead>
+          <tr style="background:#1a3c5e;color:#fff;">
+            <th style="width:38px;text-align:center">№</th>
+            <th style="width:120px">Дансны дугаар</th>
+            <th>Дансны нэр</th>
+            <th class="text-end" style="width:150px">ДТ (Дебет)</th>
+            <th class="text-end" style="width:150px">КТ (Кредит)</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% set total_dt = namespace(v=0) %}
+          {% set total_kt = namespace(v=0) %}
+          {% for line in journal.lines %}
+            {# Debit row #}
+            <tr>
+              <td class="text-center text-muted" rowspan="2">{{ loop.index }}</td>
+              <td class="font-monospace fw-semibold" style="background:#f0f7ff;">
+                {% if line.debit_account %}{{ line.debit_account.code }}{% else %}<span class="text-muted">—</span>{% endif %}
+              </td>
+              <td style="background:#f0f7ff;">
+                {% if line.debit_account %}{{ line.debit_account.name }}{% else %}<span class="text-muted">—</span>{% endif %}
+                {% if line.description %}<span class="text-muted small ms-2">· {{ line.description }}</span>{% endif %}
+              </td>
+              <td class="text-end num fw-bold text-primary" style="background:#f0f7ff;">
+                {{ "{:,.0f}".format(line.amount) }}
+              </td>
+              <td class="text-muted text-center" style="background:#f0f7ff;">—</td>
+            </tr>
+            {# Credit row #}
+            <tr>
+              <td class="font-monospace fw-semibold ps-4" style="padding-left:24px!important; border-top:none;">
+                {% if line.credit_account %}{{ line.credit_account.code }}{% else %}<span class="text-muted">—</span>{% endif %}
+              </td>
+              <td class="ps-4" style="border-top:none;">
+                {% if line.credit_account %}{{ line.credit_account.name }}{% else %}<span class="text-muted">—</span>{% endif %}
+              </td>
+              <td class="text-muted text-center" style="border-top:none;">—</td>
+              <td class="text-end num fw-bold text-danger" style="border-top:none;">
+                {{ "{:,.0f}".format(line.amount) }}
+              </td>
+            </tr>
+            {% set total_dt.v = total_dt.v + line.amount %}
+            {% set total_kt.v = total_kt.v + line.amount %}
+          {% endfor %}
+        </tbody>
+        <tfoot>
+          <tr style="background:#e8f0fe; font-weight:700;">
+            <td colspan="3" class="text-end">НИЙТ ДҮН (ДТ = КТ):</td>
+            <td class="text-end num text-primary" style="font-size:1.05em">
+              {{ "{:,.0f}".format(total_dt.v) }}
+            </td>
+            <td class="text-end num text-danger" style="font-size:1.05em">
+              {{ "{:,.0f}".format(total_kt.v) }}
+            </td>
+          </tr>
+        </tfoot>
+      </table>
+
+      <!-- Amount in words -->
+      <div class="small text-muted mb-4 ps-1">
+        Үсгээр: <em>{{ num_to_words_mn(total_dt.v) }} төгрөг</em>
+      </div>
+
+      <!-- Signature section -->
+      <div class="row mt-4 pt-3 border-top">
+        <div class="col-4 text-center">
+          <div class="sig-line"></div>
+          <div class="small text-muted mt-1">Захирал / Director</div>
+          <div class="small fw-semibold">{{ company.director }}</div>
+        </div>
+        <div class="col-4 text-center">
+          <div class="sig-line"></div>
+          <div class="small text-muted mt-1">Нягтлан бодогч / Accountant</div>
+          <div class="small fw-semibold">{{ company.accountant }}</div>
+        </div>
+        <div class="col-4 text-center">
+          <div class="sig-line"></div>
+          <div class="small text-muted mt-1">Хянасан / Verified</div>
+          <div class="small fw-semibold">&nbsp;</div>
+        </div>
+      </div>
+
+      <!-- Stamp (print) -->
+      <div class="stamp-circle d-none d-print-flex">Тэмдэг</div>
+
+    </div>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<style>
+/* ── Screen ── */
+.sig-line {
+  border-top: 1.5px solid #aaa;
+  margin: 22px auto 6px;
+  width: 78%;
+}
+.stamp-circle {
+  width: 90px; height: 90px;
+  border: 1.5px dashed #999;
+  border-radius: 50%;
+  position: absolute; right: 38px; bottom: 75px;
+  align-items: center; justify-content: center;
+  font-size: 9pt; color: #999;
+}
+.voucher-wrap { position: relative; }
+.voucher-table th { font-size: 0.83rem; }
+.voucher-table td { vertical-align: middle; font-size: 0.88rem; }
+
+/* ── Print ── */
+@media print {
+  .voucher-box { border: 2px solid #333 !important; box-shadow: none !important; }
+  .voucher-table thead tr { background: #1a3c5e !important; color: #fff !important;
+    -webkit-print-color-adjust: exact; }
+  .voucher-table tfoot tr { background: #e8f0fe !important; -webkit-print-color-adjust: exact; }
+  .voucher-table tbody tr td[style*="background:#f0f7ff"] {
+    background: #f0f7ff !important; -webkit-print-color-adjust: exact; }
+  .sig-line { border-top: 1.5px solid #333; }
+}
+</style>
+{% endblock %}

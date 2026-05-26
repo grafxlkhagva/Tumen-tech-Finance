@@ -1,0 +1,318 @@
+{% extends "base.html" %}
+{% block title %}Гүйлгээ нэмэх{% endblock %}
+{% block page_title %}Шинэ гүйлгээ{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header"><i class="fas fa-file-invoice me-2"></i>Гүйлгээний мэдээлэл</div>
+    <div class="card-body">
+
+        {# ── Загвар сонгох ── #}
+        <div class="alert" style="background:#eef4ff;border:1px solid #c7d9f8;border-radius:10px;padding:12px 16px;" id="templateBar">
+          <div class="d-flex align-items-center gap-3 flex-wrap">
+            <span class="fw-semibold text-primary" style="font-size:0.88rem;white-space:nowrap">
+              <i class="fas fa-magic me-1"></i>Загвар:
+            </span>
+            {% set tpls = [
+              ('depr',     'Элэгдэл бичих',        'fas fa-minus-circle', '#dc3545'),
+              ('salary',   'Цалин бүртгэл',         'fas fa-user-tie',     '#0d6efd'),
+              ('vat_out',  'Борлуулалт (НӨАТ)',     'fas fa-arrow-up',     '#198754'),
+              ('vat_in',   'Худалдан авалт (НӨАТ)', 'fas fa-arrow-down',   '#6f42c1'),
+              ('bank_in',  'Банкны орлого',         'fas fa-university',   '#0dcaf0'),
+              ('bank_out', 'Банкны зарлага',        'fas fa-money-bill',   '#fd7e14'),
+              ('cash_in',  'Мөнгөн орлого',         'fas fa-coins',        '#20c997'),
+              ('transfer', 'Данс хоорондын шилжүүлэг','fas fa-exchange-alt','#6c757d'),
+            ] %}
+            {% for key, label, icon, color in tpls %}
+            <button type="button"
+                    class="btn btn-sm tpl-btn"
+                    style="border:1px solid {{ color }};color:{{ color }};background:#fff;border-radius:20px;font-size:0.8rem;padding:3px 12px"
+                    onclick="applyTemplate('{{ key }}')">
+              <i class="{{ icon }} me-1"></i>{{ label }}
+            </button>
+            {% endfor %}
+            <button type="button" class="btn btn-sm btn-link text-muted ms-auto" onclick="clearLines()" style="font-size:0.78rem">
+              <i class="fas fa-times me-1"></i>Арилгах
+            </button>
+          </div>
+        </div>
+
+        <form id="journalForm" method="post">
+            <div class="row g-3 mb-3">
+                <div class="col-md-3">
+                    <label class="form-label fw-semibold">Огноо <span class="text-danger">*</span></label>
+                    <input type="date" name="date" class="form-control" value="{{ today }}" required>
+                </div>
+                <div class="col-md-5">
+                    <label class="form-label fw-semibold">Тайлбар</label>
+                    <input type="text" name="description" id="journalDesc" class="form-control" placeholder="Гүйлгээний тайлбар...">
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label fw-semibold">Лавлагаа</label>
+                    <input type="text" name="reference" class="form-control" placeholder="Баримтын дугаар...">
+                </div>
+            </div>
+
+            <!-- Lines table -->
+            <div class="mb-3">
+                <label class="form-label fw-semibold">Гүйлгээний мөрүүд <span class="text-danger">*</span></label>
+                <div class="table-responsive">
+                    <table class="table table-bordered" id="linesTable">
+                        <thead class="table-light">
+                            <tr>
+                                <th width="35%">Дебит данс</th>
+                                <th width="35%">Кредит данс</th>
+                                <th width="15%">Дүн (₮)</th>
+                                <th width="10%">Тайлбар</th>
+                                <th width="5%"></th>
+                            </tr>
+                        </thead>
+                        <tbody id="linesBody">
+                            <tr class="line-row">
+                                <td>
+                                    <select class="form-select form-select-sm debit-select">
+                                        <option value="">— Сонгоно уу —</option>
+                                        {% for a in accounts %}
+                                        <option value="{{ a.id }}">{{ a.code }} — {{ a.name }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </td>
+                                <td>
+                                    <select class="form-select form-select-sm credit-select">
+                                        <option value="">— Сонгоно уу —</option>
+                                        {% for a in accounts %}
+                                        <option value="{{ a.id }}">{{ a.code }} — {{ a.name }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </td>
+                                <td>
+                                    <input type="number" class="form-control form-control-sm amount-input text-end num"
+                                           placeholder="0" min="0" step="1">
+                                </td>
+                                <td>
+                                    <input type="text" class="form-control form-control-sm line-desc" placeholder="...">
+                                </td>
+                                <td class="text-center">
+                                    <button type="button" class="btn btn-sm btn-outline-danger remove-line" onclick="removeLine(this)">
+                                        <i class="fas fa-times"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                        </tbody>
+                        <tfoot>
+                            <tr class="table-light">
+                                <td colspan="2" class="text-end fw-semibold">Нийт:</td>
+                                <td class="text-end fw-bold num text-primary" id="totalAmount">0₮</td>
+                                <td colspan="2"></td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+                <button type="button" class="btn btn-outline-secondary btn-sm" onclick="addLine()">
+                    <i class="fas fa-plus me-1"></i>Мөр нэмэх
+                </button>
+            </div>
+
+            <!-- Balance check -->
+            <div id="balanceAlert" class="alert d-none"></div>
+
+            <input type="hidden" name="lines_data" id="linesData">
+            <div class="d-flex gap-2">
+                <button type="submit" class="btn btn-primary" id="saveBtn">
+                    <i class="fas fa-save me-1"></i>Хадгалах
+                </button>
+                <a href="{{ url_for('journals') }}" class="btn btn-outline-secondary">Болих</a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Account template for new lines -->
+<script id="accountOptionsTemplate" type="application/json">
+[{% for a in accounts %}{"id":{{ a.id }},"code":"{{ a.code }}","name":"{{ a.name }}"}{% if not loop.last %},{% endif %}{% endfor %}]
+</script>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const accounts = JSON.parse(document.getElementById('accountOptionsTemplate').textContent);
+
+// ── Build code→id and id→code lookup ──
+const byCode = {};
+const byId   = {};
+accounts.forEach(a => { byCode[a.code] = a.id; byId[a.id] = a; });
+
+function findId(code) {
+  if (byCode[code]) return byCode[code];
+  // partial: starts-with
+  const k = Object.keys(byCode).find(c => c.startsWith(code));
+  return k ? byCode[k] : null;
+}
+
+// ── Journal entry templates ──
+// Each template: { desc, lines: [{dt, kt, descHint}] }
+// dt/kt are account codes (or partial prefix)
+const TEMPLATES = {
+  depr: {
+    desc: 'Элэгдэл бичих',
+    lines: [
+      { dt: '5300', kt: '201', descHint: 'Элэгдлийн зардал' }
+    ]
+  },
+  salary: {
+    desc: 'Цалин бүртгэл',
+    lines: [
+      { dt: '5100', kt: '3310', descHint: 'Цалингийн зардал' },
+      { dt: '3310', kt: '3410', descHint: 'НДШХ суутгал' },
+      { dt: '3310', kt: '3130', descHint: 'ХХОАТ суутгал' },
+    ]
+  },
+  vat_out: {
+    desc: 'Борлуулалт / НӨАТ',
+    lines: [
+      { dt: '1210', kt: '6110', descHint: 'Тээврийн орлого (НӨАТ-гүй суурь дүн)' },
+      { dt: '1210', kt: '3132', descHint: 'НӨАТ өглөг (суурь × 10%)' },
+    ]
+  },
+  vat_in: {
+    desc: 'Худалдан авалт / НӨАТ',
+    lines: [
+      { dt: '7200', kt: '3110', descHint: 'Тээвэр зардал (НӨАТ-гүй суурь дүн)' },
+      { dt: '1352', kt: '3110', descHint: 'Оруулсан НӨАТ авлага (суурь × 10%)' },
+    ]
+  },
+  bank_in: {
+    desc: 'Банкны орлого',
+    lines: [
+      { dt: '1110', kt: '6110', descHint: 'Банкны орлого' }
+    ]
+  },
+  bank_out: {
+    desc: 'Банкны зарлага',
+    lines: [
+      { dt: '5200', kt: '1110', descHint: 'Зарлага' }
+    ]
+  },
+  cash_in: {
+    desc: 'Мөнгөн орлого',
+    lines: [
+      { dt: '1101', kt: '6110', descHint: 'Мөнгөн орлого' }
+    ]
+  },
+  transfer: {
+    desc: 'Данс хоорондын шилжүүлэг',
+    lines: [
+      { dt: '1110', kt: '1101', descHint: 'Шилжүүлэг' }
+    ]
+  },
+};
+
+function applyTemplate(key) {
+  const tpl = TEMPLATES[key];
+  if (!tpl) return;
+
+  // Set description
+  const descEl = document.getElementById('journalDesc');
+  if (!descEl.value) descEl.value = tpl.desc;
+
+  // Clear existing lines
+  const tbody = document.getElementById('linesBody');
+  tbody.innerHTML = '';
+
+  tpl.lines.forEach((line, idx) => {
+    const dtId = findId(line.dt) || '';
+    const ktId = findId(line.kt) || '';
+    const row = document.createElement('tr');
+    row.className = 'line-row';
+    row.innerHTML = `
+      <td><select class="form-select form-select-sm debit-select">${buildOptions(dtId)}</select></td>
+      <td><select class="form-select form-select-sm credit-select">${buildOptions(ktId)}</select></td>
+      <td><input type="number" class="form-control form-control-sm amount-input text-end num" placeholder="0" min="0" step="1"></td>
+      <td><input type="text" class="form-control form-control-sm line-desc" value="${line.descHint}" placeholder="..."></td>
+      <td class="text-center"><button type="button" class="btn btn-sm btn-outline-danger" onclick="removeLine(this)"><i class="fas fa-times"></i></button></td>
+    `;
+    tbody.appendChild(row);
+  });
+
+  attachAmountListeners();
+  updateTotal();
+
+  // Focus first amount field
+  const first = tbody.querySelector('.amount-input');
+  if (first) { first.focus(); first.select(); }
+}
+
+function clearLines() {
+  const tbody = document.getElementById('linesBody');
+  tbody.innerHTML = '';
+  addLine();
+  document.getElementById('journalDesc').value = '';
+}
+
+function buildOptions(selectedId) {
+    let html = '<option value="">— Сонгоно уу —</option>';
+    accounts.forEach(a => {
+        html += `<option value="${a.id}" ${a.id == selectedId ? 'selected' : ''}>${a.code} — ${a.name}</option>`;
+    });
+    return html;
+}
+
+function addLine() {
+    const tbody = document.getElementById('linesBody');
+    const row = document.createElement('tr');
+    row.className = 'line-row';
+    row.innerHTML = `
+        <td><select class="form-select form-select-sm debit-select">${buildOptions(null)}</select></td>
+        <td><select class="form-select form-select-sm credit-select">${buildOptions(null)}</select></td>
+        <td><input type="number" class="form-control form-control-sm amount-input text-end num" placeholder="0" min="0" step="1"></td>
+        <td><input type="text" class="form-control form-control-sm line-desc" placeholder="..."></td>
+        <td class="text-center"><button type="button" class="btn btn-sm btn-outline-danger" onclick="removeLine(this)"><i class="fas fa-times"></i></button></td>
+    `;
+    tbody.appendChild(row);
+    attachAmountListeners();
+}
+
+function removeLine(btn) {
+    const rows = document.querySelectorAll('.line-row');
+    if (rows.length <= 1) return;
+    btn.closest('tr').remove();
+    updateTotal();
+}
+
+function updateTotal() {
+    let total = 0;
+    document.querySelectorAll('.amount-input').forEach(inp => {
+        total += parseFloat(inp.value || 0);
+    });
+    document.getElementById('totalAmount').textContent = total.toLocaleString('mn-MN') + '₮';
+}
+
+function attachAmountListeners() {
+    document.querySelectorAll('.amount-input').forEach(inp => {
+        inp.removeEventListener('input', updateTotal);
+        inp.addEventListener('input', updateTotal);
+    });
+}
+
+document.getElementById('journalForm').addEventListener('submit', function(e) {
+    const lines = [];
+    document.querySelectorAll('.line-row').forEach(row => {
+        const debit = row.querySelector('.debit-select').value;
+        const credit = row.querySelector('.credit-select').value;
+        const amount = parseFloat(row.querySelector('.amount-input').value || 0);
+        const desc = row.querySelector('.line-desc').value;
+        if (amount > 0) {
+            lines.push({ debit_account_id: debit || null, credit_account_id: credit || null, amount, description: desc });
+        }
+    });
+    if (lines.length === 0) {
+        e.preventDefault();
+        alert('Дор хаяж нэг гүйлгээний мөр оруулна уу!');
+        return;
+    }
+    document.getElementById('linesData').value = JSON.stringify(lines);
+});
+
+attachAmountListeners();
+</script>
+{% endblock %}

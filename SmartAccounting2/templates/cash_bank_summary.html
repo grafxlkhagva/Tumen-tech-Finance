@@ -1,0 +1,223 @@
+{% extends "base.html" %}
+{% block title %}Мөнгөн хөрөнгийн нэгтгэл{% endblock %}
+{% block page_title %}Мөнгөн хөрөнгийн нэгтгэл — {{ year }} он{% endblock %}
+
+{% block topbar_actions %}
+<button onclick="window.print()" class="btn btn-outline-secondary btn-sm no-print">
+    <i class="fas fa-print me-1"></i>Хэвлэх
+</button>
+<a href="{{ url_for('cash') }}" class="btn btn-outline-primary btn-sm ms-2 no-print">
+    <i class="fas fa-arrow-left me-1"></i>Гүйлгээ
+</a>
+{% endblock %}
+
+{% block content %}
+
+{# ── macro: нэг банкны хүснэгт ─────────────────────────────────────────── #}
+{% macro bank_table(sec) %}
+<div class="bsec no-break mb-4">
+  <div class="bsec-title">
+    <span class="acc-badge">{{ sec.code }}</span>
+    {{ sec.label }}
+    <span class="ms-auto small text-muted">
+      Эхний үлдэгдэл: <strong class="num">{{ "{:,.0f}".format(sec.open) }}₮</strong>
+      &nbsp;·&nbsp;
+      Эцсийн үлдэгдэл: <strong class="num {% if sec.close < 0 %}text-danger{% endif %}">{{ "{:,.0f}".format(sec.close) }}₮</strong>
+    </span>
+  </div>
+  <div class="table-responsive">
+  <table class="bsum-table">
+    <thead>
+      <tr class="head-row">
+        <th class="row-label">Үзүүлэлт</th>
+        {% for mn in months %}<th>{{ mn }}<br>сар</th>{% endfor %}
+        <th class="total-col">Нийт</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr class="row-open">
+        <td class="row-label">Эхний үлдэгдэл</td>
+        {% for r in sec.rows %}<td class="num">{{ "{:,.0f}".format(r.open) }}</td>{% endfor %}
+        <td class="num total-col">{{ "{:,.0f}".format(sec.open) }}</td>
+      </tr>
+      <tr class="row-inc">
+        <td class="row-label"><i class="fas fa-arrow-down me-1 text-success"></i>Орлого</td>
+        {% for r in sec.rows %}<td class="num {% if r.inc == 0 %}zero{% endif %}">{{ "{:,.0f}".format(r.inc) if r.inc else '—' }}</td>{% endfor %}
+        <td class="num total-col">{{ "{:,.0f}".format(sec.total_inc) }}</td>
+      </tr>
+      <tr class="row-exp">
+        <td class="row-label"><i class="fas fa-arrow-up me-1 text-danger"></i>Зарлага</td>
+        {% for r in sec.rows %}<td class="num {% if r.exp == 0 %}zero{% endif %}">{{ "{:,.0f}".format(r.exp) if r.exp else '—' }}</td>{% endfor %}
+        <td class="num total-col">{{ "{:,.0f}".format(sec.total_exp) }}</td>
+      </tr>
+      <tr class="row-net">
+        <td class="row-label">Цэвэр урсгал</td>
+        {% for r in sec.rows %}
+        <td class="num {% if r.net > 0 %}pos{% elif r.net < 0 %}neg{% else %}zero{% endif %}">
+          {{ "{:+,.0f}".format(r.net) if r.net != 0 else '—' }}
+        </td>
+        {% endfor %}
+        <td class="num total-col {% if sec.total_net > 0 %}pos{% elif sec.total_net < 0 %}neg{% endif %}">
+          {{ "{:+,.0f}".format(sec.total_net) if sec.total_net != 0 else '—' }}
+        </td>
+      </tr>
+      <tr class="row-close">
+        <td class="row-label fw-bold">Эцсийн үлдэгдэл</td>
+        {% for r in sec.rows %}
+        <td class="num fw-bold {% if r.close < 0 %}neg{% endif %}">{{ "{:,.0f}".format(r.close) }}</td>
+        {% endfor %}
+        <td class="num total-col fw-bold {% if sec.close < 0 %}neg{% endif %}">{{ "{:,.0f}".format(sec.close) }}</td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+</div>
+{% endmacro %}
+
+{# ── Банк бүрийн хэсэг ────────────────────────────────────────────────────── #}
+{% for sec in sections %}
+{{ bank_table(sec) }}
+{% endfor %}
+
+{# ── Нэгтгэл ─────────────────────────────────────────────────────────────── #}
+<div class="bsec cons-sec no-break mb-4">
+  <div class="bsec-title cons-title">
+    <i class="fas fa-layer-group me-2"></i>Нэгтгэл — Нийт мөнгөн хөрөнгө
+    <span class="ms-auto small">
+      Эхний үлдэгдэл: <strong class="num">{{ "{:,.0f}".format(consolidated.open) }}₮</strong>
+      &nbsp;·&nbsp;
+      Эцсийн үлдэгдэл: <strong class="num {% if consolidated.close < 0 %}text-danger{% endif %}">{{ "{:,.0f}".format(consolidated.close) }}₮</strong>
+    </span>
+  </div>
+  <div class="table-responsive">
+  <table class="bsum-table cons-table">
+    <thead>
+      <tr class="head-row">
+        <th class="row-label">Үзүүлэлт</th>
+        {% for mn in months %}<th>{{ mn }}<br>сар</th>{% endfor %}
+        <th class="total-col">Нийт</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr class="row-open">
+        <td class="row-label">Эхний үлдэгдэл</td>
+        {% for r in consolidated.rows %}<td class="num">{{ "{:,.0f}".format(r.open) }}</td>{% endfor %}
+        <td class="num total-col">{{ "{:,.0f}".format(consolidated.open) }}</td>
+      </tr>
+      <tr class="row-inc">
+        <td class="row-label"><i class="fas fa-arrow-down me-1 text-success"></i>Нийт орлого</td>
+        {% for r in consolidated.rows %}<td class="num {% if r.inc == 0 %}zero{% endif %}">{{ "{:,.0f}".format(r.inc) if r.inc else '—' }}</td>{% endfor %}
+        <td class="num total-col">{{ "{:,.0f}".format(consolidated.total_inc) }}</td>
+      </tr>
+      <tr class="row-exp">
+        <td class="row-label"><i class="fas fa-arrow-up me-1 text-danger"></i>Нийт зарлага</td>
+        {% for r in consolidated.rows %}<td class="num {% if r.exp == 0 %}zero{% endif %}">{{ "{:,.0f}".format(r.exp) if r.exp else '—' }}</td>{% endfor %}
+        <td class="num total-col">{{ "{:,.0f}".format(consolidated.total_exp) }}</td>
+      </tr>
+      <tr class="row-net">
+        <td class="row-label">Цэвэр урсгал</td>
+        {% for r in consolidated.rows %}
+        <td class="num {% if r.net > 0 %}pos{% elif r.net < 0 %}neg{% else %}zero{% endif %}">
+          {{ "{:+,.0f}".format(r.net) if r.net != 0 else '—' }}
+        </td>
+        {% endfor %}
+        <td class="num total-col {% if consolidated.total_net > 0 %}pos{% elif consolidated.total_net < 0 %}neg{% endif %}">
+          {{ "{:+,.0f}".format(consolidated.total_net) if consolidated.total_net != 0 else '—' }}
+        </td>
+      </tr>
+      <tr class="row-close">
+        <td class="row-label fw-bold">Эцсийн үлдэгдэл</td>
+        {% for r in consolidated.rows %}
+        <td class="num fw-bold {% if r.close < 0 %}neg{% endif %}">{{ "{:,.0f}".format(r.close) }}</td>
+        {% endfor %}
+        <td class="num total-col fw-bold {% if consolidated.close < 0 %}neg{% endif %}">{{ "{:,.0f}".format(consolidated.close) }}</td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+</div>
+
+{# ── Тулгалт хүснэгт (check table) ────────────────────────────────────────── #}
+<div class="card no-print mb-3">
+  <div class="card-header bg-light fw-semibold"><i class="fas fa-check-double me-2 text-success"></i>Тулгалт — Банк тус бүрийн эцсийн үлдэгдэл</div>
+  <div class="card-body p-0">
+    <table class="table table-sm table-striped mb-0" style="font-size:.9rem">
+      <thead><tr><th>Банк</th><th>Данс</th><th class="text-end">Эхний үлдэгдэл</th><th class="text-end">Нийт орлого</th><th class="text-end">Нийт зарлага</th><th class="text-end">Эцсийн үлдэгдэл</th></tr></thead>
+      <tbody>
+        {% for sec in sections %}
+        <tr>
+          <td>{{ sec.label }}</td>
+          <td><span class="badge bg-secondary">{{ sec.code }}</span></td>
+          <td class="text-end num">{{ "{:,.0f}".format(sec.open) }}</td>
+          <td class="text-end num text-success">{{ "{:,.0f}".format(sec.total_inc) }}</td>
+          <td class="text-end num text-danger">{{ "{:,.0f}".format(sec.total_exp) }}</td>
+          <td class="text-end num fw-bold {% if sec.close < 0 %}text-danger{% endif %}">{{ "{:,.0f}".format(sec.close) }}</td>
+        </tr>
+        {% endfor %}
+        <tr class="table-primary fw-bold">
+          <td colspan="2">Нийт</td>
+          <td class="text-end num">{{ "{:,.0f}".format(consolidated.open) }}</td>
+          <td class="text-end num text-success">{{ "{:,.0f}".format(consolidated.total_inc) }}</td>
+          <td class="text-end num text-danger">{{ "{:,.0f}".format(consolidated.total_exp) }}</td>
+          <td class="text-end num {% if consolidated.close < 0 %}text-danger{% endif %}">{{ "{:,.0f}".format(consolidated.close) }}</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<style>
+/* ── layout ── */
+.bsec { background:#fff; border:1px solid #dee2e6; border-radius:6px; overflow:hidden; }
+.bsec-title {
+  display:flex; align-items:center; gap:6px;
+  padding:5px 10px; background:#f8f9fa;
+  font-size:.76rem; font-weight:700; border-bottom:1px solid #dee2e6;
+}
+.cons-sec { border-color:#0d6efd55; }
+.cons-title { background:#e7f1ff; }
+.acc-badge { background:#495057; color:#fff; border-radius:3px; padding:1px 5px; font-size:.68rem; font-weight:700; }
+
+/* ── table ── */
+.bsum-table { width:100%; border-collapse:collapse; font-size:.72rem; min-width:800px; }
+.bsum-table th, .bsum-table td { border:1px solid #dee2e6; padding:2px 5px; white-space:nowrap; }
+.bsum-table thead th { background:#e9ecef; font-weight:700; text-align:center; font-size:.68rem; }
+.cons-table thead th { background:#dce8ff; }
+.row-label { min-width:110px; font-size:.72rem; background:#fafafa; font-weight:500; }
+.total-col { background:#f3f4f6 !important; font-weight:600; }
+.cons-table .total-col { background:#dce8ff !important; }
+.num { text-align:right; font-family:'Courier New',monospace; font-variant-numeric:tabular-nums; font-size:.71rem; }
+.pos { color:#198754; }
+.neg { color:#dc3545; }
+.zero { color:#adb5bd; }
+
+/* ── row colors ── */
+.row-open td { background:#f8f9fa; }
+.row-inc td  { background:#f0fff4; }
+.row-exp td  { background:#fff5f5; }
+.row-net td  { background:#fffef0; }
+.row-close td{ background:#e8f4fd; border-top:2px solid #0d6efd33; }
+
+.cons-table .row-open td  { background:#eef4ff; }
+.cons-table .row-inc td   { background:#e6f9ee; }
+.cons-table .row-exp td   { background:#fdeaea; }
+.cons-table .row-net td   { background:#fffbe6; }
+.cons-table .row-close td { background:#d0e8ff; border-top:2px solid #0d6efd; }
+
+.no-break { page-break-inside: avoid; }
+
+@media print {
+  .sidebar, .topbar, .no-print, .content-area > .alert { display:none !important; }
+  .main-content { margin-left:0 !important; }
+  .content-area { padding:8px !important; }
+  .bsum-table { font-size:7.5pt; }
+  .bsec-title { font-size:9pt; }
+  .row-label { font-size:7.5pt; }
+  .bsec { margin-bottom:10px !important; }
+  @page { size: A3 landscape; margin: 10mm; }
+}
+</style>
+{% endblock %}

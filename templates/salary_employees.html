@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block title %}Ажилтнууд — Цалин{% endblock %}
+{% block page_title %}ТҮМЭН ТЭЭХ — Ажилтнуудын жагсаалт{% endblock %}
+
+{% block topbar_actions %}
+<a href="{{ url_for('salary') }}" class="btn btn-primary btn-sm">
+  <i class="fas fa-calculator me-1"></i>Цалин бодох
+</a>
+{% endblock %}
+
+{% block content %}
+<div class="card">
+  <div class="card-body p-0">
+  <table class="table table-hover table-sm mb-0" style="font-size:.82rem">
+    <thead class="table-dark">
+      <tr>
+        <th style="width:140px">Нэр</th>
+        <th>Албан тушаал</th>
+        <th style="width:120px">РД</th>
+        <th class="text-end" style="width:110px">Үндсэн цалин</th>
+        <th class="text-end" style="width:90px">Урьдчилгаа</th>
+        <th class="text-end" style="width:80px">Утас</th>
+        <th style="width:80px">Банк</th>
+        <th style="width:60px" class="text-end">Үйлдэл</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for emp in emps %}
+      <tr>
+        <td>
+          <span style="width:9px;height:9px;border-radius:50%;background:{{ emp.color }};display:inline-block;margin-right:5px"></span>
+          <span class="fw-semibold">{{ emp.full_name }}</span>
+          <div class="text-muted" style="font-size:.7rem">Ажилд орсон: {{ emp.hire_date or '—' }}</div>
+        </td>
+        <td class="text-muted">{{ emp.title }}</td>
+        <td class="font-monospace text-muted" style="font-size:.75rem">{{ emp.tin or '—' }}</td>
+        <td class="text-end font-monospace">{{ "{:,.0f}".format(emp.base_salary) }}₮</td>
+        <td class="text-end font-monospace text-muted" style="font-size:.76rem">
+          {% if emp.adv_base %}{{ "{:,.0f}".format(emp.adv_base) }}₮
+          {% else %}{{ "{:,.0f}".format(emp.base_salary * 0.4) }}₮ <span class="text-muted" style="font-size:.65rem">(40%)</span>{% endif %}
+        </td>
+        <td class="text-end font-monospace text-muted" style="font-size:.76rem">
+          {{ "{:,.0f}".format(emp.phone_allowance) if emp.phone_allowance else '—' }}
+        </td>
+        <td class="text-muted" style="font-size:.75rem">{{ emp.bank or '—' }}</td>
+        <td class="text-end">
+          <a href="{{ url_for('salary_emp_edit', emp_id=emp.id) }}"
+             class="btn btn-outline-primary btn-sm" style="padding:1px 6px;font-size:.72rem">
+            <i class="fas fa-edit"></i>
+          </a>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+</div>
+{% endblock %}
