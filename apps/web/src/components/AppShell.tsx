@@ -42,8 +42,14 @@ const NAV = [
   // Үндсэн хөрөнгө
   { href: "/fixed-assets",      label: "Үндсэн хөрөнгө",       icon: Briefcase,       section: "Хөрөнгө" },
 
-  // Тайлан (Phase 7-д бусдыг нэмнэ)
-  { href: "/trial-balance",           label: "Шалгах баланс",          icon: Calculator,    section: "Тайлан" },
+  // Тайлан
+  { href: "/reports",                 label: "Бүх тайлан",             icon: FileBarChart2, section: "Тайлан" },
+  { href: "/reports/trial-balance",   label: "Шалгах баланс",          icon: Calculator,    section: "Тайлан" },
+  { href: "/reports/balance-sheet",   label: "Санхүү байдлын тайлан",  icon: FileBarChart2, section: "Тайлан" },
+  { href: "/reports/income-statement",label: "Орлогын тайлан",         icon: TrendingUp,    section: "Тайлан" },
+  { href: "/reports/cashflow",        label: "Мөнгөн гүйлгээ",         icon: ScrollText,    section: "Тайлан" },
+  { href: "/reports/cit",             label: "ААНОАТ тайлан",          icon: FileBarChart2, section: "Тайлан" },
+  { href: "/reports/ledger",          label: "Дансны хөдөлгөөн",       icon: ScrollText,    section: "Тайлан" },
 
   // Маягт
   { href: "/forms",             label: "Анхан шатны маягт",    icon: FileSpreadsheet, section: "Маягт" },
