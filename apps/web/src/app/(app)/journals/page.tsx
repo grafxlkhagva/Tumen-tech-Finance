@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import Link from "next/link";
-import { FileText, Plus } from "lucide-react";
+import { FileText, Plus, Download } from "lucide-react";
 import { fmtMoney, fmtDate } from "@/lib/format";
 import { JOURNAL_STATUS, JOURNAL_STATUS_COLOR, type JournalStatus } from "@/lib/i18n/labels";
 import { Badge } from "@/components/ui/Badge";
@@ -45,12 +45,17 @@ export default async function JournalsPage({
           </h1>
           <p className="text-sm text-slate-500">Нийт {count ?? 0} бичлэг</p>
         </div>
-        <Link
-          href="/journals/new"
-          className="bg-slate-900 hover:bg-slate-800 text-white px-4 py-2 rounded text-sm font-medium flex items-center gap-2"
-        >
-          <Plus className="w-4 h-4" /> Шинэ гүйлгээ
-        </Link>
+        <div className="flex gap-2">
+          <a href={`/api/export/journals${status ? `?status=${status}` : ""}`} className="border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 px-3 py-2 rounded text-sm flex items-center gap-2">
+            <Download className="w-4 h-4" /> Excel
+          </a>
+          <Link
+            href="/journals/new"
+            className="bg-slate-900 hover:bg-slate-800 text-white px-4 py-2 rounded text-sm font-medium flex items-center gap-2"
+          >
+            <Plus className="w-4 h-4" /> Шинэ гүйлгээ
+          </Link>
+        </div>
       </div>
 
       {/* Filters */}
