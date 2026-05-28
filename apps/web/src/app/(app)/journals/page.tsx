@@ -1,10 +1,11 @@
 import { createClient } from "@/lib/supabase/server";
 import Link from "next/link";
-import { FileText } from "lucide-react";
-
-function fmtMoney(n: number | null | undefined) {
-  return new Intl.NumberFormat("mn-MN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n ?? 0);
-}
+import { FileText, Plus } from "lucide-react";
+import { fmtMoney, fmtDate } from "@/lib/format";
+import { JOURNAL_STATUS, JOURNAL_STATUS_COLOR, type JournalStatus } from "@/lib/i18n/labels";
+import { Badge } from "@/components/ui/Badge";
+import { Pagination } from "@/components/ui/Pagination";
+import { ToastFromURL } from "@/components/ui/Toast";
 
 type SearchParams = Promise<{ status?: string; page?: string }>;
 
@@ -36,13 +37,20 @@ export default async function JournalsPage({
 
   return (
     <div className="space-y-4">
+      <ToastFromURL />
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold text-slate-900 flex items-center gap-2">
-            <FileText className="w-6 h-6" /> Журналууд
+            <FileText className="w-6 h-6" /> Гүйлгээний бүртгэл
           </h1>
           <p className="text-sm text-slate-500">Нийт {count ?? 0} бичлэг</p>
         </div>
+        <Link
+          href="/journals/new"
+          className="bg-slate-900 hover:bg-slate-800 text-white px-4 py-2 rounded text-sm font-medium flex items-center gap-2"
+        >
+          <Plus className="w-4 h-4" /> Шинэ гүйлгээ
+        </Link>
       </div>
 
       {/* Filters */}
@@ -81,22 +89,26 @@ export default async function JournalsPage({
           <tbody className="divide-y divide-slate-100">
             {(journals ?? []).map((j) => (
               <tr key={j.id} className="hover:bg-slate-50">
-                <td className="px-4 py-2 font-mono text-xs">{j.number}</td>
-                <td className="px-4 py-2 text-xs text-slate-600">{j.date}</td>
+                <td className="px-4 py-2 font-mono text-xs">
+                  <Link href={`/journals/${j.id}`} className="text-blue-600 hover:underline">
+                    {j.number}
+                  </Link>
+                </td>
+                <td className="px-4 py-2 text-xs text-slate-600">{fmtDate(j.date)}</td>
                 <td className="px-4 py-2 text-xs">
-                  <div className="truncate max-w-md" title={j.description ?? ""}>
-                    {j.description || "—"}
-                  </div>
+                  <Link href={`/journals/${j.id}`} className="hover:underline">
+                    <div className="truncate max-w-md" title={j.description ?? ""}>
+                      {j.description || "—"}
+                    </div>
+                  </Link>
                   {j.reference && <div className="text-[0.65rem] text-slate-400 font-mono">{j.reference}</div>}
                 </td>
                 <td className="px-4 py-2 text-[0.7rem] uppercase text-slate-500">{j.source}</td>
                 <td className="px-4 py-2 font-mono text-right text-xs">{fmtMoney(Number(j.total_debit))}</td>
                 <td className="px-4 py-2 text-center">
-                  <span className={`inline-block px-2 py-0.5 text-[0.65rem] uppercase rounded font-semibold ${
-                    j.status === "posted" ? "bg-green-100 text-green-700"
-                    : j.status === "draft" ? "bg-slate-200 text-slate-700"
-                    : "bg-red-100 text-red-700"
-                  }`}>{j.status}</span>
+                  <Badge color={JOURNAL_STATUS_COLOR[j.status as JournalStatus]}>
+                    {JOURNAL_STATUS[j.status as JournalStatus]}
+                  </Badge>
                 </td>
               </tr>
             ))}
@@ -109,26 +121,12 @@ export default async function JournalsPage({
         </table>
       </div>
 
-      {/* Pagination */}
-      {totalPages > 1 && (
-        <div className="flex items-center justify-between text-xs text-slate-500">
-          <div>Хуудас {pageNum} / {totalPages}</div>
-          <div className="flex gap-1">
-            {pageNum > 1 && (
-              <Link href={`/journals?${status ? `status=${status}&` : ""}page=${pageNum - 1}`}
-                className="px-3 py-1 bg-white border border-slate-200 rounded hover:bg-slate-50">
-                ← Өмнөх
-              </Link>
-            )}
-            {pageNum < totalPages && (
-              <Link href={`/journals?${status ? `status=${status}&` : ""}page=${pageNum + 1}`}
-                className="px-3 py-1 bg-white border border-slate-200 rounded hover:bg-slate-50">
-                Дараах →
-              </Link>
-            )}
-          </div>
-        </div>
-      )}
+      <Pagination
+        page={pageNum}
+        totalPages={totalPages}
+        basePath="/journals"
+        search={{ status }}
+      />
     </div>
   );
 }
