@@ -5,17 +5,48 @@ import { usePathname } from "next/navigation";
 import {
   LayoutDashboard, FileText, BookOpen, Users, Calculator,
   Receipt, Briefcase, LogOut, Settings, ChevronLeft, Menu,
+  Banknote, Landmark, HandCoins, Wallet, ScrollText, FileSpreadsheet,
+  TrendingUp, PieChart, FileBarChart2, Building2, Coins, Link2,
+  ReceiptText,
 } from "lucide-react";
 import { useState } from "react";
 
 const NAV = [
-  { href: "/",                label: "Хяналтын самбар", icon: LayoutDashboard, section: "Гол" },
-  { href: "/journals",        label: "Журналууд",        icon: FileText,        section: "Бүртгэл" },
-  { href: "/accounts",        label: "Дансны төлөвлөгөө", icon: BookOpen,       section: "Бүртгэл" },
-  { href: "/partners",        label: "Харилцагчид",      icon: Users,           section: "Бүртгэл" },
-  { href: "/trial-balance",   label: "Шалгах баланс",    icon: Calculator,      section: "Тайлан" },
-  { href: "/vat",             label: "НӨАТ",             icon: Receipt,         section: "Тайлан" },
-  { href: "/assets",          label: "Үндсэн хөрөнгө",   icon: Briefcase,       section: "Бүртгэл" },
+  // Гол
+  { href: "/",                  label: "Хяналтын самбар",      icon: LayoutDashboard, section: "Гол" },
+
+  // Бүртгэл
+  { href: "/journals",          label: "Гүйлгээний бүртгэл",   icon: FileText,        section: "Бүртгэл" },
+  { href: "/accounts",          label: "Дансны жагсаалт",      icon: BookOpen,        section: "Бүртгэл" },
+  { href: "/partners",          label: "Харилцагчид",          icon: Users,           section: "Бүртгэл" },
+
+  // Мөнгөн хөрөнгө
+  { href: "/cash",              label: "Банкны хуулга",        icon: Banknote,        section: "Мөнгөн хөрөнгө" },
+  { href: "/cash/summary",      label: "Нэгтгэл",              icon: PieChart,        section: "Мөнгөн хөрөнгө" },
+  { href: "/cash/bank-summary", label: "Банкны нэгтгэл",       icon: Landmark,        section: "Мөнгөн хөрөнгө" },
+
+  // Татвар
+  { href: "/vat",               label: "НӨАТ бүртгэл",         icon: Receipt,         section: "Татвар" },
+  { href: "/recon/barimt-bank", label: "Баримт тулгалт",       icon: Link2,           section: "Татвар" },
+
+  // Авлага / Өглөг
+  { href: "/receivables",       label: "Авлага",               icon: HandCoins,       section: "Авлага / Өглөг" },
+  { href: "/payables",          label: "Өглөг",                icon: Wallet,          section: "Авлага / Өглөг" },
+  { href: "/invoices",          label: "Нэхэмжлэхийн тайлан",  icon: ReceiptText,     section: "Авлага / Өглөг" },
+  { href: "/recon/invoices",    label: "Нэхэмж–Банк тулгалт",  icon: Link2,           section: "Авлага / Өглөг" },
+
+  // Хүний нөөц
+  { href: "/salary",            label: "Цалингийн бүртгэл",    icon: Coins,           section: "Хүний нөөц" },
+  { href: "/salary/employees",  label: "Ажилтнууд",            icon: Users,           section: "Хүний нөөц" },
+
+  // Үндсэн хөрөнгө
+  { href: "/fixed-assets",      label: "Үндсэн хөрөнгө",       icon: Briefcase,       section: "Хөрөнгө" },
+
+  // Тайлан (Phase 7-д бусдыг нэмнэ)
+  { href: "/trial-balance",           label: "Шалгах баланс",          icon: Calculator,    section: "Тайлан" },
+
+  // Маягт
+  { href: "/forms",             label: "Анхан шатны маягт",    icon: FileSpreadsheet, section: "Маягт" },
 ];
 
 export default function AppShell({
