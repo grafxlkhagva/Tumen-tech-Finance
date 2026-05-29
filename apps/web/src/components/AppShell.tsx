@@ -9,7 +9,7 @@ import {
   TrendingUp, PieChart, FileBarChart2, Building2, Coins, Link2,
   ReceiptText,
 } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 const NAV = [
   // Гол
@@ -67,6 +67,12 @@ export default function AppShell({
   const [open, setOpen] = useState(false);
 
   let lastSection = "";
+
+  // Render date after mount so server/client locale mismatch doesn't trip hydration.
+  const [today, setToday] = useState<string>("");
+  useEffect(() => {
+    setToday(new Date().toLocaleDateString("mn-MN", { dateStyle: "full" }));
+  }, []);
 
   return (
     <div className="flex h-screen bg-slate-50">
@@ -164,8 +170,8 @@ export default function AppShell({
           >
             <Menu className="w-5 h-5" />
           </button>
-          <span className="text-xs text-slate-500">
-            {new Date().toLocaleDateString("mn-MN", { dateStyle: "full" })}
+          <span className="text-xs text-slate-500" suppressHydrationWarning>
+            {today || " "}
           </span>
         </header>
         <main className="flex-1 overflow-y-auto p-4 lg:p-6">{children}</main>
