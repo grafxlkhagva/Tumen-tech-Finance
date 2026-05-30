@@ -22,6 +22,16 @@ export type BSRow = {
   indent?: 0 | 1 | 2;
 };
 
+/**
+ * Build-time анхааруулга: chart of accounts-д харагдсан анхааруулах
+ * шаардлагатай асуудлуудыг (e.g. 201xxx contra-asset нь `liability` гэж
+ * буруу таалагдсан) хуудас + Excel-д харуулж байгаа.
+ */
+export type BSWarning = {
+  code: string;
+  message: string;
+};
+
 export type BSData = {
   assets: BSRow[];
   liabilities: BSRow[];
@@ -32,6 +42,7 @@ export type BSData = {
     equity_total: { current: number; previous: number };
     liab_equity_total: { current: number; previous: number };
   };
+  warnings: BSWarning[];
 };
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -137,6 +148,26 @@ function computeBs(m: Bal): BSCategories {
 }
 
 // ────────────────────────────────────────────────────────────────────────────
+// Defensive: walk raw rows and surface chart-of-accounts mistypes that would
+// silently corrupt the report. The most dangerous one is 201xxx contra-asset
+// (хуримтлагдсан элэгдэл) being typed as `liability` instead of `asset` —
+// the RPC then flips its sign and `fixed_assets = stb('200') + stb('201')`
+// double-counts depreciation as POSITIVE, inflating asset_total.
+// ────────────────────────────────────────────────────────────────────────────
+function collectWarnings(rows: RawBalance[]): BSWarning[] {
+  const seen = new Map<string, BSWarning>();
+  for (const r of rows) {
+    if (r.code.startsWith("201") && r.type !== "asset") {
+      seen.set(r.code, {
+        code: r.code,
+        message: `${r.code} «${r.name}» нь хуримтлагдсан элэгдэл (contra-asset) тул type='asset' байх ёстой, гэвч type='${r.type}'. Балансад үндсэн хөрөнгийн утга буруу гарна.`,
+      });
+    }
+  }
+  return [...seen.values()];
+}
+
+// ────────────────────────────────────────────────────────────────────────────
 // Public: build full structured BS for two dates
 // ────────────────────────────────────────────────────────────────────────────
 export function buildBalanceSheet(
@@ -145,6 +176,8 @@ export function buildBalanceSheet(
 ): BSData {
   const cur = computeBs(indexBalances(current));
   const prv = computeBs(indexBalances(previous));
+  // Хоёр огнооноос ирсэн raw row-нуудыг merge хийгээд анхааруулга цуглуулна.
+  const warnings = collectWarnings([...current, ...previous]);
 
   const dual = (a: keyof BSCategories): { current: number; previous: number } => ({
     current: cur[a],
@@ -207,6 +240,7 @@ export function buildBalanceSheet(
       equity_total:       dual("total_equity"),
       liab_equity_total:  dual("total_liab_equity"),
     },
+    warnings,
   };
 }
 
@@ -220,9 +254,16 @@ export function defaultPrevDate(asOf: string): string {
   return `${y - 1}-12-31`;
 }
 
-/** Safely parse an ISO date param. Falls back to today. */
+/**
+ * Safely parse an ISO date param.
+ *
+ * Default нь legacy app.py:1019-тай (default '2025-12-31') парити болгож,
+ * **өмнөх жилийн санхүүгийн он төгсгөл** (`YYYY-1-12-31`)-аар буцаана.
+ * Учир нь хагас жилд өнөөдрийн огноо нь P&L хагастай, "Тайлант үеийн ашиг"
+ * мөр буруу гарж болзошгүй.
+ */
 export function parseAsOf(input: string | undefined): string {
-  if (!input) return new Date().toISOString().slice(0, 10);
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(input)) return new Date().toISOString().slice(0, 10);
-  return input;
+  if (input && /^\d{4}-\d{2}-\d{2}$/.test(input)) return input;
+  const now = new Date();
+  return `${now.getFullYear() - 1}-12-31`;
 }

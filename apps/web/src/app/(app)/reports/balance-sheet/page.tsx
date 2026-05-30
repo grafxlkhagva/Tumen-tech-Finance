@@ -1,10 +1,12 @@
 import { createClient } from "@/lib/supabase/server";
-import { FileBarChart2, Download } from "lucide-react";
+import { getCurrentCompany } from "@/lib/supabase/company";
+import { FileBarChart2, Download, AlertTriangle } from "lucide-react";
 import { fmtMoneyOrDash, fmtMoney, fmtDateLong } from "@/lib/format";
 import { PrintButton } from "@/components/ui/PrintButton";
 import {
   type RawBalance,
   type BSRow,
+  type BSWarning,
   buildBalanceSheet,
   parseAsOf,
   defaultPrevDate,
@@ -17,34 +19,44 @@ type SearchParams = Promise<{ as_of?: string; prev?: string }>;
 export default async function BalanceSheetPage({ searchParams }: { searchParams: SearchParams }) {
   const sp = await searchParams;
   const asOf = parseAsOf(sp.as_of);
-  const prev = sp.prev ? parseAsOf(sp.prev) : defaultPrevDate(asOf);
+  const prev = sp.prev && /^\d{4}-\d{2}-\d{2}$/.test(sp.prev) ? sp.prev : defaultPrevDate(asOf);
 
   const supabase = await createClient();
+  const company = await getCurrentCompany(supabase);
 
-  // Resolve company
-  const { data: uc } = await supabase
-    .from("user_companies")
-    .select("company_id, companies(name, register, tin)")
-    .order("is_default", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  const companyId = uc?.company_id ?? null;
-  const companyMeta = (Array.isArray(uc?.companies) ? uc?.companies[0] : uc?.companies) ?? null;
+  // Тэргүүн алдаа #3: company resolution бүтэлгүйтсэн бол хоосон тайлан үзүүлэхгүй.
+  if (!company) {
+    return (
+      <div className="max-w-5xl mx-auto p-8">
+        <h1 className="text-2xl font-semibold flex items-center gap-2 mb-4">
+          <FileBarChart2 className="w-6 h-6" /> Санхүү байдлын тайлан
+        </h1>
+        <div className="bg-amber-50 border border-amber-200 rounded p-4 text-sm text-amber-900">
+          Байгууллага сонгогдоогүй байна. Профайл хэсгээс үндсэн байгууллагаа сонгоно уу.
+        </div>
+      </div>
+    );
+  }
 
-  // Fetch balances for both dates
-  const [curRes, prvRes] = companyId
-    ? await Promise.all([
-        supabase.rpc("fn_account_balance_at", { p_company_id: companyId, p_as_of: asOf }),
-        supabase.rpc("fn_account_balance_at", { p_company_id: companyId, p_as_of: prev }),
-      ])
-    : [{ data: [] }, { data: [] }];
+  const [curRes, prvRes] = await Promise.all([
+    supabase.rpc("fn_account_balance_at", { p_company_id: company.companyId, p_as_of: asOf }),
+    supabase.rpc("fn_account_balance_at", { p_company_id: company.companyId, p_as_of: prev }),
+  ]);
+
+  // Тэргүүн алдаа #2: RPC error-ыг чимээгүй "0=0 тэнцсэн" болгохгүй,
+  // улаан banner-аар үзүүлнэ.
+  const rpcError = curRes.error?.message || prvRes.error?.message || null;
 
   const bs = buildBalanceSheet(
     (curRes.data ?? []) as RawBalance[],
     (prvRes.data ?? []) as RawBalance[],
   );
 
-  const exportUrl = `/api/export/balance-sheet?as_of=${asOf}&prev=${prev}`;
+  // Excel route-д prev-г URL-аар дамжуулах нь шаардлагагүй болсон —
+  // сервер нь as_of-аас автомат тооцоолно. Гэвч user-ийн override-г хадгална.
+  const exportParams = new URLSearchParams({ as_of: asOf });
+  if (sp.prev) exportParams.set("prev", prev);
+  const exportUrl = `/api/export/balance-sheet?${exportParams.toString()}`;
 
   return (
     <div className="space-y-4 max-w-7xl mx-auto">
@@ -55,15 +67,23 @@ export default async function BalanceSheetPage({ searchParams }: { searchParams:
         </h1>
         <div className="flex gap-2 items-center">
           <form method="GET" className="flex items-center gap-1.5">
-            <label className="text-xs text-slate-500">Тайлагнах огноо:</label>
+            <label htmlFor="bs-as-of" className="text-xs text-slate-500">
+              Тайлагнах огноо:
+            </label>
             <input
+              id="bs-as-of"
+              key={asOf}
               type="date"
               name="as_of"
               defaultValue={asOf}
               className="px-2 py-1.5 border border-slate-300 rounded text-sm"
             />
-            <input type="hidden" name="prev" value={prev} />
-            <button className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs">
+            {/*
+              Тэргүүн алдаа #1: hidden `prev` талбарыг устгасан. Хэрэглэгч
+              `as_of` солихол сервер шинээр `defaultPrevDate(asOf)` тооцоолно.
+              Тусгай харьцуулалт хүсвэл URL-д `?prev=YYYY-MM-DD` нэмж болно.
+            */}
+            <button type="submit" className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs">
               Харуулах
             </button>
           </form>
@@ -77,6 +97,31 @@ export default async function BalanceSheetPage({ searchParams }: { searchParams:
         </div>
       </div>
 
+      {/* RPC error banner */}
+      {rpcError && (
+        <div className="bg-red-50 border border-red-200 rounded p-3 text-sm text-red-800 print:hidden flex items-start gap-2">
+          <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
+          <div>
+            <div className="font-semibold">Тайлан татаж чадсангүй</div>
+            <div className="text-xs opacity-80 mt-0.5">{rpcError}</div>
+          </div>
+        </div>
+      )}
+
+      {/* Chart-of-accounts mistype warnings */}
+      {bs.warnings.length > 0 && (
+        <div className="bg-amber-50 border border-amber-200 rounded p-3 text-xs text-amber-900 print:hidden">
+          <div className="font-semibold mb-1 flex items-center gap-1">
+            <AlertTriangle className="w-3.5 h-3.5" /> Дансны тохиргооны анхааруулга
+          </div>
+          <ul className="space-y-0.5 list-disc list-inside">
+            {bs.warnings.map((w) => (
+              <li key={w.code}>{w.message}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       {/* Form header (Сангийн Сайдын маяг) */}
       <div className="bg-white rounded border border-slate-200 p-4 text-center print:border-0">
         <div className="text-xs text-slate-500">
@@ -86,13 +131,15 @@ export default async function BalanceSheetPage({ searchParams }: { searchParams:
           САНХҮҮ БАЙДЛЫН ТАЙЛАН
         </h2>
         <div className="text-sm text-slate-700">
-          <span className="font-semibold">&quot;{companyMeta?.name ?? "Тумэн"}&quot; ХХК</span>
+          <span className="font-semibold">
+            &quot;{company.meta?.name ?? "(Байгууллага сонгогдоогүй)"}&quot; ХХК
+          </span>
           {" · "}
           <span>{fmtDateLong(asOf)}-ний байдлаар</span>
         </div>
         <div className="text-xs text-slate-500 mt-1">
-          {companyMeta?.register && <>Регистр: {companyMeta.register} | </>}
-          {companyMeta?.tin && <>ХРГ: {companyMeta.tin} | </>}
+          {company.meta?.register && <>Регистр: {company.meta.register} | </>}
+          {company.meta?.tin && <>ХРГ: {company.meta.tin} | </>}
           (төгрөгөөр)
         </div>
       </div>
@@ -170,6 +217,7 @@ export default async function BalanceSheetPage({ searchParams }: { searchParams:
       <BalanceCheck
         current={bs.totals.asset_total.current - bs.totals.liab_equity_total.current}
         previous={bs.totals.asset_total.previous - bs.totals.liab_equity_total.previous}
+        hasData={!rpcError && (curRes.data?.length ?? 0) > 0}
       />
 
       <style>{`@media print { @page { size: A4 landscape; margin: 0.6cm; } body { background: white; } }`}</style>
@@ -191,7 +239,23 @@ function BSRowEl({ row }: { row: BSRow }) {
   );
 }
 
-function BalanceCheck({ current, previous }: { current: number; previous: number }) {
+function BalanceCheck({
+  current,
+  previous,
+  hasData,
+}: {
+  current: number;
+  previous: number;
+  hasData: boolean;
+}) {
+  // hasData=false бол "Хөрөнгө = Өр" гэсэн дүгнэлт хайхрамжтай (бүх утга 0).
+  if (!hasData) {
+    return (
+      <div className="bg-slate-50 border border-slate-200 rounded p-3 text-sm text-slate-600 print:hidden">
+        Энэ хугацааны хувьд бүртгэгдсэн дансны хөдөлгөөн алга байна.
+      </div>
+    );
+  }
   const curOk = Math.abs(current) < 0.5;
   const prvOk = Math.abs(previous) < 0.5;
   if (curOk && prvOk) {
@@ -204,8 +268,8 @@ function BalanceCheck({ current, previous }: { current: number; previous: number
   return (
     <div className="bg-red-50 border border-red-200 rounded p-3 text-sm text-red-800 print:hidden">
       ⚠ Тэнцлийн зөрүү илэрлээ:
-      {!curOk && <span> Энэ огноо: ₮{fmtMoney(current)}</span>}
-      {!prvOk && <span> · Өмнөх огноо: ₮{fmtMoney(previous)}</span>}
+      {!curOk && <span> Энэ огноо: ±₮{fmtMoney(Math.abs(current))}</span>}
+      {!prvOk && <span> · Өмнөх огноо: ±₮{fmtMoney(Math.abs(previous))}</span>}
     </div>
   );
 }
