@@ -105,7 +105,11 @@ export default async function IncomeStatementPage({
       </div>
 
       {/* Filter bar */}
-      <IncomeStatementFilters dateFrom={period.from} dateTo={period.to} />
+      <IncomeStatementFilters
+        dateFrom={period.from}
+        dateTo={period.to}
+        currentYear={Number(period.from.slice(0, 4)) || new Date().getFullYear()}
+      />
 
       {/* Error banner */}
       {rpcError && (

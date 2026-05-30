@@ -175,14 +175,37 @@ export type IsPeriod = {
   label: string;
 };
 
-const isoDate = (s: unknown): string | null =>
-  typeof s === "string" && /^\d{4}-\d{2}-\d{2}$/.test(s) ? s : null;
+/**
+ * Strict ISO-date validator. Accepts the YYYY-MM-DD pattern AND verifies the
+ * date is a real calendar date — rejects "2026-02-30", "2026-13-01", etc.
+ * Without the round-trip check, malformed query params (or hostile input)
+ * would propagate to Postgres and surface as "invalid input syntax for type
+ * date" 500 errors.
+ */
+const isoDate = (s: unknown): string | null => {
+  if (typeof s !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(s)) return null;
+  const d = new Date(s + "T00:00:00Z");
+  return !isNaN(d.getTime()) && d.toISOString().slice(0, 10) === s ? s : null;
+};
 
-function lastDayOfMonth(y: number, m: number): string {
+function lastDayOfMonth(y: number, m: number): number {
   // m is 1-12; new Date(year, m, 0) returns last day of month m
-  const d = new Date(y, m, 0).getDate();
-  return `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+  return new Date(y, m, 0).getDate();
 }
+
+const lastDayIso = (y: number, m: number): string =>
+  `${y}-${String(m).padStart(2, "0")}-${String(lastDayOfMonth(y, m)).padStart(2, "0")}`;
+
+/**
+ * Build an ISO date for (y, m, d), clamping `d` down to the last day of the
+ * month when the calendar can't accommodate it. Solves the Feb 29 → Feb 28
+ * leap-year regression where `date_from=2024-02-29` would otherwise produce
+ * `prevFrom=2023-02-29` and crash the RPC.
+ */
+const clampedIso = (y: number, m: number, d: number): string => {
+  const safe = Math.min(d, lastDayOfMonth(y, m));
+  return `${y}-${String(m).padStart(2, "0")}-${String(safe).padStart(2, "0")}`;
+};
 
 /**
  * Parse the IS period from URL search params. Honors:
@@ -206,11 +229,12 @@ export function parseIsPeriod(sp: {
   if (explicitFrom && explicitTo) {
     const [fy, fm, fd] = explicitFrom.split("-").map(Number);
     const [ty, tm, td] = explicitTo.split("-").map(Number);
+    // Leap-year safe: prev year's Feb 29 doesn't exist → clamp to Feb 28.
     return {
       from: explicitFrom,
       to: explicitTo,
-      prevFrom: `${fy - 1}-${String(fm).padStart(2, "0")}-${String(fd).padStart(2, "0")}`,
-      prevTo:   `${ty - 1}-${String(tm).padStart(2, "0")}-${String(td).padStart(2, "0")}`,
+      prevFrom: clampedIso(fy - 1, fm, fd),
+      prevTo:   clampedIso(ty - 1, tm, td),
       label: `${explicitFrom} — ${explicitTo}`,
     };
   }
@@ -221,9 +245,9 @@ export function parseIsPeriod(sp: {
   if (month) {
     return {
       from: `${year}-${String(month).padStart(2, "0")}-01`,
-      to:   lastDayOfMonth(year, month),
+      to:   lastDayIso(year, month),
       prevFrom: `${year - 1}-${String(month).padStart(2, "0")}-01`,
-      prevTo:   lastDayOfMonth(year - 1, month),
+      prevTo:   lastDayIso(year - 1, month),
       label: `${year} оны ${month}-р сар`,
     };
   }
