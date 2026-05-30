@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
+import { getCurrentCompany } from "@/lib/supabase/company";
 import Link from "next/link";
-import { ScrollText, Download, Table2, Landmark } from "lucide-react";
+import { ScrollText, Download, Table2, Landmark, AlertTriangle } from "lucide-react";
 import { PrintButton } from "@/components/ui/PrintButton";
 import {
   type CashflowMonthlyRow,
@@ -22,32 +23,25 @@ export default async function CashflowPage({ searchParams }: { searchParams: Sea
   const mode = sp.mode === "official" ? "official" : "internal";
 
   const supabase = await createClient();
-  const { data: uc } = await supabase
-    .from("user_companies")
-    .select("company_id, companies(name, register, tin)")
-    .order("is_default", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+  const company = await getCurrentCompany(supabase);
 
-  const companyId = uc?.company_id ?? null;
-  const companyMeta = (Array.isArray(uc?.companies) ? uc?.companies[0] : uc?.companies) ?? null;
-
-  if (!companyId) {
+  // Тэргүүн алдаа #2: helper-р resolution → typed CompanyMeta авна.
+  if (!company) {
     return (
       <div className="max-w-5xl mx-auto p-8">
         <h1 className="text-2xl font-semibold flex items-center gap-2 mb-4">
           <ScrollText className="w-6 h-6" /> Мөнгөн гүйлгээний тайлан
         </h1>
-        <div className="bg-red-50 border border-red-200 rounded p-4 text-sm text-red-800">
-          Байгууллага сонгогдоогүй байна.
+        <div className="bg-amber-50 border border-amber-200 rounded p-4 text-sm text-amber-900">
+          Байгууллага сонгогдоогүй байна. Профайл хэсгээс үндсэн байгууллагаа сонгоно уу.
         </div>
       </div>
     );
   }
 
   const [flowRes, openRes] = await Promise.all([
-    supabase.rpc("fn_cashflow_monthly", { p_company_id: companyId, p_year: year }),
-    supabase.rpc("fn_cashflow_opening_cash", { p_company_id: companyId, p_year: year }),
+    supabase.rpc("fn_cashflow_monthly", { p_company_id: company.companyId, p_year: year }),
+    supabase.rpc("fn_cashflow_opening_cash", { p_company_id: company.companyId, p_year: year }),
   ]);
 
   const rpcError = flowRes.error?.message || openRes.error?.message || null;
@@ -57,7 +51,11 @@ export default async function CashflowPage({ searchParams }: { searchParams: Sea
   const internal = buildInternalCashflow(rawRows, openCash);
   const official = buildOfficialCashflow(rawRows);
 
-  const yearOptions = [year - 2, year - 1, year, year + 1].filter((y) => y > 2020);
+  // Тэргүүн алдаа #1: бүх жилийн dropdown — 2021-аас current+1 хүртэл.
+  const minYear = 2021;
+  const maxYear = new Date().getFullYear() + 1;
+  const yearOptions = Array.from({ length: maxYear - minYear + 1 }, (_, i) => minYear + i);
+
   const exportUrl = `/api/export/cashflow?year=${year}&mode=${mode}`;
 
   return (
@@ -87,7 +85,9 @@ export default async function CashflowPage({ searchParams }: { searchParams: Sea
           {/* Year selector */}
           <form method="GET" className="flex items-center gap-1.5">
             <input type="hidden" name="mode" value={mode} />
+            <label htmlFor="cf-year" className="sr-only">Жил</label>
             <select
+              id="cf-year"
               name="year"
               defaultValue={year}
               className="px-2 py-1.5 border border-slate-300 rounded text-xs"
@@ -96,7 +96,7 @@ export default async function CashflowPage({ searchParams }: { searchParams: Sea
                 <option key={y} value={y}>{y} он</option>
               ))}
             </select>
-            <button className="px-3 py-1.5 bg-slate-700 hover:bg-slate-800 text-white rounded text-xs">
+            <button type="submit" className="px-3 py-1.5 bg-slate-700 hover:bg-slate-800 text-white rounded text-xs">
               Үзэх
             </button>
           </form>
@@ -113,8 +113,41 @@ export default async function CashflowPage({ searchParams }: { searchParams: Sea
 
       {/* Error banner */}
       {rpcError && (
-        <div className="bg-red-50 border border-red-200 rounded p-3 text-sm text-red-800 print:hidden">
-          RPC алдаа: {rpcError}
+        <div className="bg-red-50 border border-red-200 rounded p-3 text-sm text-red-800 print:hidden flex items-start gap-2">
+          <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
+          <div>
+            <div className="font-semibold">Тайлан татаж чадсангүй</div>
+            <div className="text-xs opacity-80 mt-0.5">{rpcError}</div>
+          </div>
+        </div>
+      )}
+
+      {/* Orphan categories warning — surfaces transactions tagged with codes
+          that don't appear in the SPEC, so they're not silently dropped. */}
+      {internal.orphanCategories.length > 0 && (
+        <div className="bg-amber-50 border border-amber-200 rounded p-3 text-xs text-amber-900 print:hidden">
+          <div className="font-semibold mb-1 flex items-center gap-1">
+            <AlertTriangle className="w-3.5 h-3.5" />
+            Ангилаагүй гүйлгээ илэрсэн ({internal.orphanCategories.length})
+          </div>
+          <div className="opacity-80 mb-1">
+            Доорх категори SPEC-д ороогүй тул тайлангийн нийт дүнд орохгүй. Ангиллыг засна уу.
+          </div>
+          <ul className="space-y-0.5 list-disc list-inside">
+            {internal.orphanCategories.slice(0, 5).map((o) => (
+              <li key={`${o.direction}-${o.category}`}>
+                <span className="font-mono">{o.category || "(хоосон)"}</span>
+                {" "}({o.direction === "income" ? "орлого" : "зарлага"})
+                {" — "}
+                <span className="font-mono">
+                  {o.total.toLocaleString("mn-MN", { maximumFractionDigits: 0 })}₮
+                </span>
+              </li>
+            ))}
+            {internal.orphanCategories.length > 5 && (
+              <li>… бусад {internal.orphanCategories.length - 5} төрөл</li>
+            )}
+          </ul>
         </div>
       )}
 
@@ -127,7 +160,7 @@ export default async function CashflowPage({ searchParams }: { searchParams: Sea
             style={{ background: "linear-gradient(135deg,#1a3c5e,#2196F3)" }}
           >
             <div className="text-xs opacity-75">
-              {(companyMeta?.name ?? "Тумэн") + " ХХК"}
+              {(company.meta?.name ?? "(Байгууллага сонгогдоогүй)") + " ХХК"}
             </div>
             <h2 className="text-base sm:text-lg font-bold tracking-wide uppercase mt-1">
               МӨНГӨН УРСГАЛЫН ТАЙЛАН — {year} ОН
@@ -139,15 +172,19 @@ export default async function CashflowPage({ searchParams }: { searchParams: Sea
 
           <div className="text-xs text-slate-500 print:hidden">
             Эх сурвалж: бүх банкны cash_transactions &nbsp;·&nbsp; Эхний үлдэгдэл:&nbsp;
-            <span className="font-mono">{internal.openCash.toLocaleString("mn-MN")}₮</span>
+            <span className="font-mono">
+              {internal.openCash.toLocaleString("mn-MN", { maximumFractionDigits: 0 })}₮
+            </span>
             &nbsp;({year - 1}-12-31)
           </div>
         </>
       ) : (
         <CashflowOfficialView
           data={official}
-          companyMeta={companyMeta as { name?: string; register?: string | null } | null}
+          companyMeta={company.meta}
           year={year}
+          openCash={internal.openCash}
+          closeCash={internal.grandClosing}
         />
       )}
 

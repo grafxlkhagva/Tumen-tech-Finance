@@ -1,8 +1,12 @@
 import type { CFOfficial } from "@/lib/reports/cashflow";
+import type { CompanyMeta } from "@/lib/supabase/company";
 import { ArrowDownToLine, ArrowUpFromLine, Equal, ArrowLeftRight, Building, HandCoins, BarChart3 } from "lucide-react";
 
 const fmt = (n: number) =>
   n ? Math.abs(n).toLocaleString("mn-MN", { maximumFractionDigits: 0 }) : "—";
+
+const fmtSigned = (n: number) =>
+  n === 0 ? "—" : n.toLocaleString("mn-MN", { maximumFractionDigits: 0 });
 
 const MN = ["", "1-р", "2-р", "3-р", "4-р", "5-р", "6-р", "7-р", "8-р", "9-р", "10-р", "11-р", "12-р"];
 
@@ -15,13 +19,15 @@ export function CashflowOfficialView({
   data,
   companyMeta,
   year,
+  openCash,
+  closeCash,
 }: {
   data: CFOfficial;
-  companyMeta: { name?: string; register?: string | null } | null;
+  companyMeta: CompanyMeta | null;
   year: number;
+  openCash: number;
+  closeCash: number;
 }) {
-  const today = new Date().toISOString().slice(0, 10);
-
   return (
     <div className="space-y-3">
       {/* Header */}
@@ -31,10 +37,11 @@ export function CashflowOfficialView({
         </div>
         <h2 className="text-lg font-bold mt-2 mb-1 uppercase">МӨНГӨН ГҮЙЛГЭЭНИЙ ТАЙЛАН</h2>
         <div className="text-sm text-slate-700">
-          &quot;{companyMeta?.name ?? "Тумэн"}&quot; ХХК &nbsp;·&nbsp; {today}
+          &quot;{companyMeta?.name ?? "(Байгууллага сонгогдоогүй)"}&quot; ХХК &nbsp;·&nbsp; {year} он
         </div>
         <div className="text-xs text-slate-500">
-          {companyMeta?.register && <>Регистр: {companyMeta.register} &nbsp;|&nbsp;</>}
+          {companyMeta?.register && <>Регистр: {companyMeta.register} &nbsp;|&nbsp; </>}
+          {companyMeta?.tin && <>ХРГ: {companyMeta.tin} &nbsp;|&nbsp; </>}
           (төгрөгөөр)
         </div>
       </div>
@@ -102,11 +109,11 @@ export function CashflowOfficialView({
             <hr className="border-white/25 my-2" />
             <div className="flex items-center justify-between gap-3 text-xs opacity-75">
               <div>5. Эхний үлдэгдэл (тайлант үе эхлэх)</div>
-              <div className="font-mono">—</div>
+              <div className="font-mono">{fmtSigned(openCash)}₮</div>
             </div>
-            <div className="flex items-center justify-between gap-3 text-xs opacity-75">
+            <div className="flex items-center justify-between gap-3 text-xs opacity-90">
               <div>6. Эцсийн үлдэгдэл (тайлант үе дуусах)</div>
-              <div className="font-mono">—</div>
+              <div className="font-mono font-semibold">{fmtSigned(closeCash)}₮</div>
             </div>
           </div>
         </div>

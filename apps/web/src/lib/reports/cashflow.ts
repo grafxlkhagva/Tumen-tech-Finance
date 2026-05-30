@@ -37,6 +37,11 @@ export type CFInternal = {
   openCash: number;
   netTotalByMonth: number[];      // 12 values
   grandClosing: number;
+  /**
+   * SPEC-аас гадуур ангилалтай (e.g. "9.9.9", "Бусад") гүйлгээний
+   * жагсаалт — page-д warning banner үзүүлэхэд хэрэглэгдэнэ.
+   */
+  orphanCategories: { category: string; direction: "income" | "expense"; total: number }[];
 };
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -164,12 +169,44 @@ export function buildInternalCashflow(
   for (const s of SPEC) {
     if (s.kind === "data") valByCode.set(s.code, get(s.dir, s.code));
   }
+  // Subtotal = sum of children PLUS any direct transactions tagged on the
+  // subtotal code itself (e.g. accountant typed "1.2" instead of "1.2.1").
+  // Without this, those transactions would silently vanish from the report
+  // even though they're in the database — a data-loss bug.
   for (const s of SPEC) {
     if (s.kind === "subtotal") {
-      const vs = s.sumOf.reduce((acc, c) => add12(acc, valByCode.get(c) ?? ZERO12()), ZERO12());
-      valByCode.set(s.code, vs);
+      const fromChildren = s.sumOf.reduce(
+        (acc, c) => add12(acc, valByCode.get(c) ?? ZERO12()),
+        ZERO12(),
+      );
+      const directOnSubtotal = add12(get("income", s.code), get("expense", s.code));
+      valByCode.set(s.code, add12(fromChildren, directOnSubtotal));
     }
   }
+
+  // Collect orphan categories — transactions tagged with codes that don't
+  // appear in SPEC at all (e.g. "9.9.9", "Бусад", "Ангилаагүй"). These would
+  // otherwise be invisible to the report; surface them so the user can fix
+  // the source data.
+  const declaredCodes = new Set<string>();
+  for (const s of SPEC) {
+    if (s.kind === "data" || s.kind === "subtotal") declaredCodes.add(s.code);
+  }
+  const orphanCategories: CFInternal["orphanCategories"] = [];
+  for (const [k, v] of idx) {
+    const [dir, cat] = k.split("::");
+    if (!declaredCodes.has(cat)) {
+      const total = sum12(v);
+      if (Math.abs(total) > 0.5) {
+        orphanCategories.push({
+          category: cat,
+          direction: dir as "income" | "expense",
+          total,
+        });
+      }
+    }
+  }
+  orphanCategories.sort((a, b) => Math.abs(b.total) - Math.abs(a.total));
 
   // Aggregates referenced by `computeKey`
   const total_inc = ["1.1.1","1.1.2","1.1.3","1.1.4"]
@@ -237,6 +274,7 @@ export function buildInternalCashflow(
     openCash,
     netTotalByMonth: net_total,
     grandClosing: closingByMonth[11] ?? openCash,
+    orphanCategories,
   };
 }
 
