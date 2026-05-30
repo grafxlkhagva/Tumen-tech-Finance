@@ -15,12 +15,14 @@ import {
   Printer,
   ListChecks,
   BarChart3,
+  Ban,
 } from "lucide-react";
 import { fmtMoney } from "@/lib/format";
 import { ToastFromURL } from "@/components/ui/Toast";
 import { PrintButton } from "@/components/ui/PrintButton";
 import {
   type InvoiceRow,
+  PAGE_LIMIT,
   buildInvoiceSummary,
   filterInvoices,
   isOverdue,
@@ -36,7 +38,6 @@ type SearchParams = Promise<{
   q?: string;
 }>;
 
-// Lucide doesn't ship a FileInvoice — use FileText as the closest invoice glyph
 const FileInvoiceIcon = FileText;
 
 export default async function InvoicesReportPage({
@@ -63,6 +64,9 @@ export default async function InvoicesReportPage({
     );
   }
 
+  // CRITICAL FIX #1: hard PAGE_LIMIT cap prevents an OOM if the table grows
+  // to 10K+ rows. We surface a banner when the cap is hit so the user knows
+  // some invoices may be hidden until they narrow the filter.
   const { data, error } = await supabase
     .from("receivables")
     .select(
@@ -71,16 +75,18 @@ export default async function InvoicesReportPage({
     .eq("company_id", company.companyId)
     .is("deleted_at", null)
     .order("invoice_date", { ascending: false })
-    .order("invoice_no", { ascending: false });
+    .order("invoice_no", { ascending: false })
+    .limit(PAGE_LIMIT);
 
   const allRows = (data ?? []).map((r) => ({
     ...r,
     partner: Array.isArray(r.partner) ? r.partner[0] ?? null : r.partner ?? null,
   })) as InvoiceRow[];
+  const limitReached = allRows.length >= PAGE_LIMIT;
 
   const filteredRows = filterInvoices(allRows, filters);
   const summary = buildInvoiceSummary(filteredRows);
-  const allSummary = buildInvoiceSummary(allRows); // for chip counts
+  const allSummary = buildInvoiceSummary(allRows); // unfiltered — for chip counts + KPI sub-counts
   const monthly = monthlyBreakdown(allRows);
 
   const today = new Date().toISOString().slice(0, 10);
@@ -108,25 +114,25 @@ export default async function InvoicesReportPage({
         </div>
       </div>
 
-      {/* KPI cards */}
+      {/* KPI cards — sub now ReactNode (CRITICAL FIX #3) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
         <KpiCard
           label="Нийт нэхэмжилсэн"
-          value={`${fmtMoney(allSummary.totalBilled).replace(/\.00$/, "")}₮`}
+          value={`${fmtMoneyInt(allSummary.totalBilled)}₮`}
           sub={`${allSummary.counts.all} нэхэмжлэл`}
           icon={<FileInvoiceIcon className="w-5 h-5" />}
           gradient="from-blue-500 to-blue-700"
         />
         <KpiCard
           label="Цугласан"
-          value={`${fmtMoney(allSummary.totalPaid).replace(/\.00$/, "")}₮`}
+          value={`${fmtMoneyInt(allSummary.totalPaid)}₮`}
           sub={`${allSummary.counts.paid} бүрэн төлөгдсөн`}
           icon={<CheckCircle2 className="w-5 h-5" />}
           gradient="from-emerald-500 to-emerald-700"
         />
         <KpiCard
           label="Үлдэгдэл авлага"
-          value={`${fmtMoney(allSummary.totalRemaining).replace(/\.00$/, "")}₮`}
+          value={`${fmtMoneyInt(allSummary.totalRemaining)}₮`}
           sub={`${allSummary.counts.open + allSummary.counts.partial} нэхэмжлэл`}
           icon={<Clock className="w-5 h-5" />}
           gradient="from-orange-500 to-orange-700"
@@ -134,49 +140,54 @@ export default async function InvoicesReportPage({
         <KpiCard
           label="Цуглуулалтын хувь"
           value={`${allSummary.collectionPct.toFixed(1)}%`}
-          sub="&nbsp;"
+          sub={<>&nbsp;</>}
           icon={<Percent className="w-5 h-5" />}
           gradient="from-purple-700 to-fuchsia-700"
         />
       </div>
 
-      {/* Filters + search */}
+      {/*
+        Filter form — chips are now form <button type="submit"> instead of
+        <Link> (CRITICAL FIX #2), so clicking a chip submits the same form
+        as month/search, preserving any in-progress search text. The
+        clicked button's name="status"/value="…" overrides the hidden
+        <input name="status">.
+      */}
       <div className="bg-white border border-slate-200 rounded p-2 print:hidden">
         <form method="GET" className="flex flex-wrap items-center gap-2">
-          {/* Status chips — anchor tags so each click is a fresh URL */}
+          {/* Hidden default status — gets replaced by whichever chip is clicked. */}
+          <input type="hidden" name="status" value={filters.status} />
+
           <div className="inline-flex rounded border border-slate-300 overflow-hidden text-xs">
-            <StatusChip
+            <ChipButton
               label="Бүгд"
               count={allSummary.counts.all}
               active={!filters.status}
-              href={buildUrl({ ...sp, status: "" })}
+              value=""
               color="slate"
             />
-            <StatusChip
+            <ChipButton
               label="Нээлттэй"
               count={allSummary.counts.open}
               active={filters.status === "open"}
-              href={buildUrl({ ...sp, status: "open" })}
+              value="open"
               color="red"
             />
-            <StatusChip
+            <ChipButton
               label="Хэсэгчлэн"
               count={allSummary.counts.partial}
               active={filters.status === "partial"}
-              href={buildUrl({ ...sp, status: "partial" })}
+              value="partial"
               color="amber"
             />
-            <StatusChip
+            <ChipButton
               label="Төлөгдсөн"
               count={allSummary.counts.paid}
               active={filters.status === "paid"}
-              href={buildUrl({ ...sp, status: "paid" })}
+              value="paid"
               color="emerald"
             />
           </div>
-
-          {/* Hidden status so the form preserves it on submit */}
-          <input type="hidden" name="status" value={filters.status} />
 
           {/* Month dropdown */}
           <label htmlFor="inv-month" className="sr-only">Сар</label>
@@ -203,17 +214,21 @@ export default async function InvoicesReportPage({
                 name="q"
                 defaultValue={filters.q}
                 placeholder="Нэхэмж # эсвэл харилцагч…"
+                maxLength={100}
                 className="pl-6 pr-2 py-1 border border-slate-300 rounded text-xs w-[220px]"
               />
             </div>
             {filters.q && (
-              <Link
-                href={buildUrl({ ...sp, q: "" })}
+              // Clear-button as submit (empties q while preserving other params)
+              <button
+                type="submit"
+                name="q"
+                value=""
                 className="px-1.5 py-1 border border-red-300 text-red-700 rounded text-xs hover:bg-red-50"
                 title="Хайлт цэвэрлэх"
               >
                 <X className="w-3 h-3" />
-              </Link>
+              </button>
             )}
           </div>
 
@@ -225,6 +240,20 @@ export default async function InvoicesReportPage({
           </button>
         </form>
       </div>
+
+      {/* Page-limit warning */}
+      {limitReached && (
+        <div className="bg-amber-50 border border-amber-200 rounded p-3 text-xs text-amber-900 print:hidden flex items-start gap-2">
+          <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
+          <div>
+            <div className="font-semibold">Хязгаар хүрсэн ({PAGE_LIMIT.toLocaleString()} мөр)</div>
+            <div className="opacity-80 mt-0.5">
+              Энэ хязгаараас илүү нэхэмжлэл бүртгэлд байгаа. Бүгдийг харахын тулд төлөв,
+              сар, эсвэл хайлтаар шүүнэ үү. (Phase 4-д cursor pagination нэмэгдэнэ.)
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Error banner */}
       {error && (
@@ -260,7 +289,7 @@ export default async function InvoicesReportPage({
                 <th className="px-2 py-2 text-right font-semibold w-28">Төлсөн</th>
                 <th className="px-2 py-2 text-right font-semibold w-28">Үлдэгдэл</th>
                 <th className="px-2 py-2 text-left font-semibold w-24">Төлөв</th>
-                <th className="px-2 py-2 text-left font-semibold w-24 print:hidden"></th>
+                <th className="px-2 py-2 text-left font-semibold w-32 print:hidden"></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -284,13 +313,13 @@ export default async function InvoicesReportPage({
                     Нийт {filteredRows.length} нэхэмжлэл:
                   </td>
                   <td className="px-2 py-1.5 text-right font-mono">
-                    {fmtMoney(summary.totalBilled).replace(/\.00$/, "")}
+                    {fmtMoneyInt(summary.totalBilled)}
                   </td>
                   <td className="px-2 py-1.5 text-right font-mono text-emerald-700">
-                    {fmtMoney(summary.totalPaid).replace(/\.00$/, "")}
+                    {fmtMoneyInt(summary.totalPaid)}
                   </td>
                   <td className={`px-2 py-1.5 text-right font-mono ${summary.totalRemaining > 0 ? "text-red-700" : ""}`}>
-                    {fmtMoney(summary.totalRemaining).replace(/\.00$/, "")}
+                    {fmtMoneyInt(summary.totalRemaining)}
                   </td>
                   <td colSpan={2}></td>
                 </tr>
@@ -329,14 +358,10 @@ export default async function InvoicesReportPage({
                   <tr key={row.month}>
                     <td className="px-2 py-1 font-semibold">{row.month}-р сар</td>
                     <td className="px-2 py-1 text-right">{row.count}</td>
-                    <td className="px-2 py-1 text-right font-mono">
-                      {fmtMoney(row.billed).replace(/\.00$/, "")}
-                    </td>
-                    <td className="px-2 py-1 text-right font-mono text-emerald-700">
-                      {fmtMoney(row.paid).replace(/\.00$/, "")}
-                    </td>
+                    <td className="px-2 py-1 text-right font-mono">{fmtMoneyInt(row.billed)}</td>
+                    <td className="px-2 py-1 text-right font-mono text-emerald-700">{fmtMoneyInt(row.paid)}</td>
                     <td className={`px-2 py-1 text-right font-mono ${row.remaining > 0 ? "text-red-700" : "text-slate-400"}`}>
-                      {row.remaining > 0 ? fmtMoney(row.remaining).replace(/\.00$/, "") : "—"}
+                      {row.remaining > 0 ? fmtMoneyInt(row.remaining) : "—"}
                     </td>
                     <td className="px-2 py-1">
                       <div className="h-1.5 bg-slate-100 rounded overflow-hidden">
@@ -367,45 +392,46 @@ export default async function InvoicesReportPage({
   );
 }
 
-function buildUrl(sp: Record<string, string | undefined>): string {
-  const next = new URLSearchParams();
-  for (const [k, v] of Object.entries(sp)) {
-    if (v) next.set(k, v);
-  }
-  const s = next.toString();
-  return `/invoices${s ? `?${s}` : ""}`;
+/** Local helper — strips trailing ".00" from Mongolian-formatted money. */
+function fmtMoneyInt(n: number): string {
+  return fmtMoney(n).replace(/\.00$/, "");
 }
 
-function StatusChip({
+function ChipButton({
   label,
   count,
   active,
-  href,
+  value,
   color,
 }: {
   label: string;
   count: number;
   active: boolean;
-  href: string;
+  value: string;
   color: "slate" | "red" | "amber" | "emerald";
 }) {
   const palette = {
-    slate:    { active: "bg-slate-700 text-white border-slate-700",     idle: "text-slate-700 hover:bg-slate-50",       badge: "bg-slate-200 text-slate-700"   },
-    red:      { active: "bg-red-600 text-white border-red-600",         idle: "text-red-700 hover:bg-red-50",            badge: "bg-red-100 text-red-700"        },
-    amber:    { active: "bg-amber-500 text-white border-amber-500",     idle: "text-amber-700 hover:bg-amber-50",        badge: "bg-amber-100 text-amber-700"    },
-    emerald:  { active: "bg-emerald-600 text-white border-emerald-600", idle: "text-emerald-700 hover:bg-emerald-50",    badge: "bg-emerald-100 text-emerald-700" },
+    slate:    { active: "bg-slate-700 text-white",     idle: "text-slate-700 hover:bg-slate-50",    badge: "bg-slate-200 text-slate-700"   },
+    red:      { active: "bg-red-600 text-white",       idle: "text-red-700 hover:bg-red-50",        badge: "bg-red-100 text-red-700"        },
+    amber:    { active: "bg-amber-500 text-white",     idle: "text-amber-700 hover:bg-amber-50",    badge: "bg-amber-100 text-amber-700"    },
+    emerald:  { active: "bg-emerald-600 text-white",   idle: "text-emerald-700 hover:bg-emerald-50", badge: "bg-emerald-100 text-emerald-700" },
   }[color];
 
+  // type="submit" with name="status" + value — clicking the button submits
+  // the form with status=value, overriding the hidden <input name="status">.
+  // This is what preserves the in-progress search text + month dropdown.
   return (
-    <Link
-      href={href}
+    <button
+      type="submit"
+      name="status"
+      value={value}
       className={`px-3 py-1 flex items-center gap-1 border-r border-slate-200 last:border-r-0 ${active ? palette.active : palette.idle}`}
     >
       {label}
-      <span className={`px-1.5 py-0.5 rounded text-[0.65rem] ${active ? "bg-white/20" : palette.badge}`}>
+      <span className={`px-1.5 py-0.5 rounded text-[0.65rem] ${active ? "bg-white/25" : palette.badge}`}>
         {count}
       </span>
-    </Link>
+    </button>
   );
 }
 
@@ -455,16 +481,14 @@ function InvoiceRowEl({
           "—"
         )}
       </td>
-      <td className="px-2 py-1.5 text-right font-mono">
-        {fmtMoney(r.total_amount).replace(/\.00$/, "")}
-      </td>
+      <td className="px-2 py-1.5 text-right font-mono">{fmtMoneyInt(r.total_amount)}</td>
       <td className="px-2 py-1.5 text-right font-mono text-emerald-700">
-        {r.paid_amount > 0 ? fmtMoney(r.paid_amount).replace(/\.00$/, "") : "—"}
+        {r.paid_amount > 0 ? fmtMoneyInt(r.paid_amount) : "—"}
       </td>
       <td
         className={`px-2 py-1.5 text-right font-mono font-bold ${r.remaining > 0 ? "text-red-700" : "text-slate-400"}`}
       >
-        {r.remaining > 0 ? fmtMoney(r.remaining).replace(/\.00$/, "") : "—"}
+        {r.remaining > 0 ? fmtMoneyInt(r.remaining) : "—"}
       </td>
       <td className="px-2 py-1.5">
         <StatusBadge status={r.status} overdue={overdue} pct={pct} />
@@ -475,10 +499,24 @@ function InvoiceRowEl({
             href={`/invoices/${r.id}/print`}
             target="_blank"
             className="border border-emerald-300 text-emerald-700 hover:bg-emerald-50 px-1.5 py-0.5 rounded text-[0.65rem] flex items-center gap-1 whitespace-nowrap"
-            title="Хэвлэх загвар"
+            title="Шинэ хэвлэх загвар"
           >
             <Printer className="w-2.5 h-2.5" /> Шинэ
           </Link>
+          {/* HIGH FIX #4: T-1 button restoring legacy parity. The /forms/t1
+              page currently shows partner-level aggregates; passing
+              ?partner=… makes the URL semantically correct so a future
+              filter implementation will Just Work. */}
+          {r.partner && (
+            <Link
+              href={`/forms/t1?partner=${r.partner.id}`}
+              target="_blank"
+              className="border border-blue-300 text-blue-700 hover:bg-blue-50 px-1.5 py-0.5 rounded text-[0.65rem] flex items-center gap-1 whitespace-nowrap"
+              title="Т-1 маяг (харилцагчийн тооцоо нийлэх акт)"
+            >
+              <Printer className="w-2.5 h-2.5" /> Т-1
+            </Link>
+          )}
           <Link
             href={`/receivables/${r.id}/edit`}
             className="border border-slate-300 text-slate-700 hover:bg-slate-50 px-1.5 py-0.5 rounded text-[0.65rem] flex items-center gap-1 whitespace-nowrap"
@@ -520,7 +558,24 @@ function StatusBadge({
       </div>
     );
   }
-  // open / draft / void
+  // HIGH FIX #5: distinct badge for `void` status. Previously fell through
+  // to "Нээлттэй" which was misleading — accountants couldn't tell that a
+  // voided invoice was no longer collectable.
+  if (status === "void") {
+    return (
+      <span className="inline-block px-2 py-0.5 bg-slate-200 text-slate-600 rounded text-[0.65rem] font-semibold flex items-center gap-1">
+        <Ban className="w-2.5 h-2.5" /> Цуцлагдсан
+      </span>
+    );
+  }
+  if (status === "draft") {
+    return (
+      <span className="inline-block px-2 py-0.5 bg-slate-100 text-slate-500 rounded text-[0.65rem] font-semibold">
+        Ноорог
+      </span>
+    );
+  }
+  // open
   if (overdue) {
     return (
       <span className="inline-block px-2 py-0.5 bg-red-100 text-red-700 rounded text-[0.65rem] font-semibold">
@@ -544,7 +599,8 @@ function KpiCard({
 }: {
   label: string;
   value: string;
-  sub: string;
+  /** ReactNode — drops the dangerouslySetInnerHTML escape hatch. */
+  sub: React.ReactNode;
   icon: React.ReactNode;
   gradient: string;
 }) {
@@ -555,7 +611,7 @@ function KpiCard({
         {icon}
       </div>
       <div className="text-xl font-bold font-mono leading-tight">{value}</div>
-      <div className="text-[0.7rem] opacity-80 mt-0.5" dangerouslySetInnerHTML={{ __html: sub }} />
+      <div className="text-[0.7rem] opacity-80 mt-0.5">{sub}</div>
     </div>
   );
 }

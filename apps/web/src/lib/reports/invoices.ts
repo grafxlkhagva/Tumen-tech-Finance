@@ -72,9 +72,18 @@ export function parseInvoiceFilters(sp: {
 }
 
 // ────────────────────────────────────────────────────────────────────────────
-// Filtering — applied after fetch so KPI counts can be computed both ways
-// (filtered vs unfiltered).
+// Filtering — applied after fetch so KPI/chip counts can be computed from
+// the same unfiltered fetch (matches legacy invoice_list semantics).
+//
+// Pagination strategy:
+//   The page fetches up to PAGE_LIMIT rows in a single Supabase query and
+//   surfaces a warning when the cap is hit. Phase 4 (Q3) will push status +
+//   month into the SQL query + add cursor pagination; for now ≤PAGE_LIMIT
+//   covers ~5 years of typical SMB invoice volume.
 // ────────────────────────────────────────────────────────────────────────────
+
+/** Hard cap on how many invoices we'll load + render per request. */
+export const PAGE_LIMIT = 2000;
 
 export function filterInvoices(rows: InvoiceRow[], f: InvoiceFilters): InvoiceRow[] {
   const needle = f.q.toLowerCase();
@@ -82,7 +91,7 @@ export function filterInvoices(rows: InvoiceRow[], f: InvoiceFilters): InvoiceRo
     if (f.status && r.status !== f.status) return false;
     if (f.month) {
       const m = Number(r.invoice_date.slice(5, 7));
-      if (m !== f.month) return false;
+      if (!Number.isFinite(m) || m !== f.month) return false;
     }
     if (needle) {
       const inv = (r.invoice_no ?? "").toLowerCase();
@@ -149,7 +158,9 @@ export function monthlyBreakdown(rows: InvoiceRow[]): MonthlyAggregate[] {
 // ────────────────────────────────────────────────────────────────────────────
 
 export function isOverdue(r: InvoiceRow, today: string): boolean {
-  if (r.status === "paid" || r.status === "void") return false;
+  // Drafts haven't been finalized → don't show "хэтэрсэн" for them either.
+  // Voids and paid invoices are obviously not overdue.
+  if (r.status === "paid" || r.status === "void" || r.status === "draft") return false;
   if (!r.due_date) return false;
   return r.due_date < today;
 }
