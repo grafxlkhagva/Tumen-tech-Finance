@@ -110,9 +110,14 @@ export default async function SalaryPage({ searchParams }: { searchParams: Searc
             defaultValue={String(y)}
             className="px-2 py-1.5 border border-slate-300 rounded text-xs w-[90px]"
           >
-            {[2024, 2025, 2026, 2027].map((yy) => (
-              <option key={yy} value={yy}>{yy}</option>
-            ))}
+            {/* HIGH FIX #4: full year range so historical/future payroll is reachable. */}
+            {(() => {
+              const minYear = 2020;
+              const maxYear = new Date().getFullYear() + 1;
+              return Array.from({ length: maxYear - minYear + 1 }, (_, i) => minYear + i).map((yy) => (
+                <option key={yy} value={yy}>{yy}</option>
+              ));
+            })()}
           </select>
           <button type="submit" className="px-3 py-1.5 bg-slate-700 hover:bg-slate-800 text-white rounded text-xs">
             Үзэх

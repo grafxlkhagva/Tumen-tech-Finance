@@ -75,9 +75,21 @@ export function SalaryGrid({
   const [hhoatPay, setHhoatPay] = useState("");
   const [showPostForm, setShowPostForm] = useState(false);
 
-  const allApproved = records.length > 0 && records.every((r) => r.status === "approved");
-  const allDraft = records.length > 0 && records.every((r) => r.status === "draft");
-  const allPosted = records.length > 0 && records.every((r) => r.status === "posted");
+  // HIGH FIX #5: legacy used "all-or-nothing" status detection — but a single
+  // new draft row would hide every workflow button. Count by status and let
+  // the user act on the partial subset.
+  const statusCounts = records.reduce(
+    (acc, r) => {
+      if (r.status === "draft")    acc.draft++;
+      else if (r.status === "approved") acc.approved++;
+      else if (r.status === "posted")   acc.posted++;
+      return acc;
+    },
+    { draft: 0, approved: 0, posted: 0 },
+  );
+  const hasDraft    = statusCounts.draft    > 0;
+  const hasApproved = statusCounts.approved > 0;
+  const allPosted   = records.length > 0 && statusCounts.posted === records.length;
 
   function notify(s: string) {
     setMsg(s);
@@ -94,7 +106,12 @@ export function SalaryGrid({
   }
 
   function handleCellChange(recordId: string | null, field: string, value: number) {
-    if (!recordId) return;
+    // CRITICAL FIX #2: emit feedback so users aren't typing into a black hole.
+    // Previously `if (!recordId) return` silently dropped the keystroke.
+    if (!recordId) {
+      notify("⚠ Эхлээд 'Тооцоолох / Сэргээх' дарж бүртгэл үүсгэнэ үү");
+      return;
+    }
     startTransition(async () => {
       const r = await updateSalaryCell(recordId, field, value);
       if (r.error) notify(`⚠ ${r.error}`);
@@ -151,6 +168,13 @@ export function SalaryGrid({
     return Number.isFinite(n) ? n : 0;
   };
 
+  // HIGH FIX #8 helper — Enter inside a numeric cell blurs it so the onBlur
+  // commit handler fires (spreadsheet UX expectation). Down/Up arrow keys are
+  // left to the browser's native number-spinner.
+  const enterToBlur = (ev: React.KeyboardEvent<HTMLInputElement>) => {
+    if (ev.key === "Enter") ev.currentTarget.blur();
+  };
+
   const totals = rowPreviews.reduce(
     (s, { rec, preview }) => {
       if (!rec) return s;
@@ -201,7 +225,7 @@ export function SalaryGrid({
         <KpiCard
           label="ЭМНДШ — АЖИЛТАН"
           value={`${fmtInt(totals.emndsh)}₮`}
-          sub="11.5% сууттгал"
+          sub="11.5% суутгал"
           icon={<HeartPulse className="w-5 h-5" />}
           gradient="from-red-500 to-red-700"
         />
@@ -250,24 +274,46 @@ export function SalaryGrid({
           >
             <Calculator className="w-3.5 h-3.5" /> Тооцоолох / Сэргээх
           </button>
-          {records.length > 0 && allDraft && (
+          {hasDraft && (
             <button
               onClick={handleApprove}
               disabled={pending}
               className="bg-yellow-500 hover:bg-yellow-600 text-white px-3 py-1.5 rounded text-xs flex items-center gap-1.5 disabled:opacity-60"
+              title={`${statusCounts.draft} ноорог бичлэг баталгаажих`}
             >
               <CheckCircle2 className="w-3.5 h-3.5" /> Баталгаажуулах
+              <span className="ml-0.5 px-1.5 py-0 bg-white/25 rounded text-[0.65rem]">
+                {statusCounts.draft}
+              </span>
             </button>
           )}
-          {records.length > 0 && allApproved && !showPostForm && (
+          {hasApproved && !showPostForm && (
             <button
               onClick={() => setShowPostForm(true)}
               className="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded text-xs flex items-center gap-1.5"
+              title={`${statusCounts.approved} баталгаажсан бичлэг журналд орох`}
             >
               <FileText className="w-3.5 h-3.5" /> Журналд оруулах
+              <span className="ml-0.5 px-1.5 py-0 bg-white/25 rounded text-[0.65rem]">
+                {statusCounts.approved}
+              </span>
             </button>
           )}
           {allPosted && <Badge color="bg-emerald-100 text-emerald-700">Журналд орсон</Badge>}
+          {/* Status legend for mixed state — surfaces e.g. "ноорог:1 батлсан:5"
+              so the accountant sees why both Approve + Post buttons can show
+              at the same time. */}
+          {(() => {
+            const nonZero = (statusCounts.draft > 0 ? 1 : 0) + (statusCounts.approved > 0 ? 1 : 0) + (statusCounts.posted > 0 ? 1 : 0);
+            if (nonZero < 2) return null;
+            return (
+              <span className="text-[0.65rem] text-slate-500 ml-1">
+                {statusCounts.draft > 0 && <>ноорог:{statusCounts.draft} </>}
+                {statusCounts.approved > 0 && <>батлсан:{statusCounts.approved} </>}
+                {statusCounts.posted > 0 && <>журналд:{statusCounts.posted}</>}
+              </span>
+            );
+          })()}
         </div>
         {msg && <span className="text-xs text-slate-600">{msg}</span>}
       </div>
@@ -358,7 +404,13 @@ export function SalaryGrid({
                   const ded23Val  = preview?.ded23  ?? 0;
                   const advVal    = preview?.adv    ?? safeNum(rec?.advance);
                   const gartVal   = preview?.gart   ?? safeNum(rec?.net_pay);
-                  const workedPct = totalHours > 0 ? ((rec?.worked_hours ?? totalHours) / totalHours) * 100 : 0;
+                  // CRITICAL FIX #3: only compute the percent when we actually
+                  // have a payroll record. Otherwise the column would falsely
+                  // read "100%" (because default = totalHours / totalHours)
+                  // for employees who never punched in this month.
+                  const workedPct = rec && totalHours > 0
+                    ? (rec.worked_hours / totalHours) * 100
+                    : null;
                   return (
                     <tr key={e.id} className="hover:bg-slate-50">
                       <td className="px-2 py-1.5">
@@ -387,10 +439,13 @@ export function SalaryGrid({
                             const v = Number(ev.target.value);
                             if (rec && v !== rec.worked_hours) handleCellChange(rec.id, "worked_hours", v);
                           }}
+                          onKeyDown={enterToBlur}
                           disabled={!rec}
                           className="w-16 px-1 py-0.5 border border-slate-300 rounded text-right text-xs font-mono disabled:bg-slate-50"
                         />
-                        <div className="text-[0.62rem] text-slate-400 mt-0.5">{workedPct.toFixed(0)}%</div>
+                        <div className="text-[0.62rem] text-slate-400 mt-0.5">
+                          {workedPct === null ? "—" : `${workedPct.toFixed(0)}%`}
+                        </div>
                       </td>
                       <td className="px-2 py-1.5 text-right">
                         <input
@@ -400,6 +455,7 @@ export function SalaryGrid({
                             const v = Number(ev.target.value);
                             if (rec && v !== rec.sales_bonus) handleCellChange(rec.id, "sales_bonus", v);
                           }}
+                          onKeyDown={enterToBlur}
                           disabled={!rec}
                           placeholder="0"
                           className="w-20 px-1 py-0.5 border border-slate-300 rounded text-right text-xs font-mono disabled:bg-slate-50"
@@ -413,6 +469,7 @@ export function SalaryGrid({
                             const v = Number(ev.target.value);
                             if (rec && v !== rec.leave_pay) handleCellChange(rec.id, "leave_pay", v);
                           }}
+                          onKeyDown={enterToBlur}
                           disabled={!rec}
                           placeholder="0"
                           className="w-20 px-1 py-0.5 border border-slate-300 rounded text-right text-xs font-mono disabled:bg-slate-50"
@@ -441,6 +498,7 @@ export function SalaryGrid({
                             const v = Number(ev.target.value);
                             if (rec && v !== rec.advance) handleCellChange(rec.id, "advance", v);
                           }}
+                          onKeyDown={enterToBlur}
                           disabled={!rec}
                           className="w-24 px-1 py-0.5 border border-slate-300 rounded text-right text-xs font-mono disabled:bg-slate-50"
                           style={{ color: "#e65100" }}
