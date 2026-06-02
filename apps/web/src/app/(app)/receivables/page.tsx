@@ -6,6 +6,7 @@ import {
 } from "lucide-react";
 import { fmtMoney } from "@/lib/format";
 import { ToastFromURL } from "@/components/ui/Toast";
+import { PrintButton } from "@/components/ui/PrintButton";
 import {
   type ReceivableRpcRow,
   buildReceivableSummary,
@@ -15,6 +16,13 @@ import {
 export const metadata = { title: "Авлагын бүртгэл — Тумэн Accounting" };
 
 type SearchParams = Promise<{ status?: string }>;
+
+// CRITICAL FIX #3 — NaN-safe number coercion. Number("abc") returns NaN which
+// would otherwise propagate through reductions ("NaN₮" in the footer).
+function safeNum(v: unknown): number {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : 0;
+}
 
 function fmtInt(n: number): string {
   return fmtMoney(n).replace(/\.00$/, "");
@@ -63,13 +71,20 @@ export default async function ReceivablesPage({
       <div className="flex items-center justify-between flex-wrap gap-2 print:hidden">
         <h1 className="text-2xl font-semibold text-slate-900 flex items-center gap-2">
           <HandCoins className="w-6 h-6" /> Авлагын бүртгэл
+          {/* CRITICAL FIX #2 — surface tenant name like the other rebuilt pages. */}
+          <span className="text-base text-slate-500 font-normal">
+            — &quot;{company.meta?.name ?? "—"}&quot; ХХК
+          </span>
         </h1>
-        <Link
-          href="/receivables/new"
-          className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded text-xs flex items-center gap-1"
-        >
-          <Plus className="w-3.5 h-3.5" /> Авлага нэмэх
-        </Link>
+        <div className="flex items-center gap-2">
+          <Link
+            href="/receivables/new"
+            className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded text-xs flex items-center gap-1"
+          >
+            <Plus className="w-3.5 h-3.5" /> Авлага нэмэх
+          </Link>
+          <PrintButton />
+        </div>
       </div>
 
       {/* 3 KPI gradient cards (legacy parity) */}
@@ -147,6 +162,16 @@ export default async function ReceivablesPage({
         </div>
       )}
 
+      {/* Print stylesheet — A4 landscape so the 9-column table fits. */}
+      <style>{`
+        @media print {
+          @page { size: A4 landscape; margin: 10mm; }
+          body { background: white; }
+          table { font-size: 8pt !important; }
+          thead { background: #1a3c5e !important; color: white !important; -webkit-print-color-adjust: exact; }
+        }
+      `}</style>
+
       {/* Table */}
       <div className="bg-white border border-slate-200 rounded overflow-hidden">
         <div className="overflow-x-auto">
@@ -176,25 +201,36 @@ export default async function ReceivablesPage({
                 filtered.map((r) => <ReceivableRowEl key={r.partner_id} r={r} />)
               )}
             </tbody>
-            {filtered.length > 0 && (
-              <tfoot className="bg-blue-50 font-bold">
-                <tr>
-                  <td colSpan={3} className="px-2 py-1.5 text-right">
-                    Нийт {filtered.length} харилцагч:
-                  </td>
-                  <td className="px-2 py-1.5 text-right font-mono">
-                    {fmtInt(filtered.reduce((s, r) => s + Number(r.invoiced), 0))}₮
-                  </td>
-                  <td className="px-2 py-1.5 text-right font-mono text-emerald-700">
-                    {fmtInt(filtered.reduce((s, r) => s + Number(r.collected), 0))}₮
-                  </td>
-                  <td className="px-2 py-1.5 text-right font-mono text-red-700">
-                    {fmtInt(filtered.reduce((s, r) => s + Number(r.remaining), 0))}₮
-                  </td>
-                  <td colSpan={3}></td>
-                </tr>
-              </tfoot>
-            )}
+            {filtered.length > 0 && (() => {
+              // One pass for all three totals (was three reduces) + NaN-safe.
+              const footerTotals = filtered.reduce(
+                (s, r) => ({
+                  inv: s.inv + safeNum(r.invoiced),
+                  col: s.col + safeNum(r.collected),
+                  rem: s.rem + safeNum(r.remaining),
+                }),
+                { inv: 0, col: 0, rem: 0 },
+              );
+              return (
+                <tfoot className="bg-blue-50 font-bold">
+                  <tr>
+                    <td colSpan={3} className="px-2 py-1.5 text-right">
+                      Нийт {filtered.length} харилцагч:
+                    </td>
+                    <td className="px-2 py-1.5 text-right font-mono">
+                      {fmtInt(footerTotals.inv)}₮
+                    </td>
+                    <td className="px-2 py-1.5 text-right font-mono text-emerald-700">
+                      {fmtInt(footerTotals.col)}₮
+                    </td>
+                    <td className="px-2 py-1.5 text-right font-mono text-red-700">
+                      {fmtInt(footerTotals.rem)}₮
+                    </td>
+                    <td colSpan={3}></td>
+                  </tr>
+                </tfoot>
+              );
+            })()}
           </table>
         </div>
       </div>
@@ -231,10 +267,12 @@ function Chip({
 }
 
 function ReceivableRowEl({ r }: { r: ReceivableRpcRow }) {
-  const invoiced = Number(r.invoiced);
-  const collected = Number(r.collected);
-  const remaining = Number(r.remaining);
-  const matchPct = Number(r.match_pct);
+  // NaN-safe column extraction — handles the case where the RPC returns
+  // numeric-as-string and a bad row would otherwise render "NaN₮".
+  const invoiced = safeNum(r.invoiced);
+  const collected = safeNum(r.collected);
+  const remaining = safeNum(r.remaining);
+  const matchPct = safeNum(r.match_pct);
 
   return (
     <tr className="hover:bg-slate-50">
