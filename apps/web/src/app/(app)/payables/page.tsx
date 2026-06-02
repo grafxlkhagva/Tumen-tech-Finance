@@ -9,19 +9,16 @@ import { ToastFromURL } from "@/components/ui/Toast";
 import { PrintButton } from "@/components/ui/PrintButton";
 import {
   type PayableRpcRow,
+  PAGE_LIMIT,
   buildPayableSummary,
+  displayApStatus,
   parseApStatus,
+  safeNum,
 } from "@/lib/reports/payables";
 
 export const metadata = { title: "Өглөгийн бүртгэл — Тумэн Accounting" };
 
 type SearchParams = Promise<{ status?: string; q?: string }>;
-
-/** NaN-safe number coercion. */
-function safeNum(v: unknown): number {
-  const n = Number(v);
-  return Number.isFinite(n) ? n : 0;
-}
 
 function fmtInt(n: number): string {
   return fmtMoney(n).replace(/\.00$/, "");
@@ -63,8 +60,13 @@ export default async function PayablesPage({
   });
 
   const allRows = (data ?? []) as PayableRpcRow[];
+  const limitReached = allRows.length >= PAGE_LIMIT;
   const summary = buildPayableSummary(allRows);
-  const filtered = status ? allRows.filter((r) => r.status === status) : allRows;
+  // Filter by the *display* status so "overpaid" is its own bucket and
+  // "open" excludes overpaid suppliers.
+  const filtered = status
+    ? allRows.filter((r) => displayApStatus(r) === status)
+    : allRows;
 
   return (
     <div className="space-y-3 max-w-[1600px] mx-auto">
@@ -182,6 +184,15 @@ export default async function PayablesPage({
               value="paid"
               color="emerald"
             />
+            {summary.cnt.overpaid > 0 && (
+              <ChipButton
+                label="Банк илүү"
+                count={summary.cnt.overpaid}
+                active={status === "overpaid"}
+                value="overpaid"
+                color="blue"
+              />
+            )}
           </div>
 
           <button
@@ -204,6 +215,19 @@ export default async function PayablesPage({
           <div>
             <div className="font-semibold">Өгөгдөл татаж чадсангүй</div>
             <div className="text-xs opacity-80 mt-0.5">{error.message}</div>
+          </div>
+        </div>
+      )}
+
+      {limitReached && (
+        <div className="bg-amber-50 border border-amber-200 rounded p-3 text-xs text-amber-900 flex items-start gap-2 print:hidden">
+          <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
+          <div>
+            <div className="font-semibold">Хязгаар хүрсэн ({PAGE_LIMIT.toLocaleString()} мөр)</div>
+            <div className="opacity-80 mt-0.5">
+              Энэ хязгаараас илүү нийлүүлэгч бүртгэлд байгаа. Бүгдийг харахын тулд
+              нэрээр хайх эсвэл төлвөөр шүүнэ үү.
+            </div>
           </div>
         </div>
       )}
@@ -289,13 +313,14 @@ function ChipButton({
   count: number;
   active: boolean;
   value: string;
-  color: "slate" | "red" | "amber" | "emerald";
+  color: "slate" | "red" | "amber" | "emerald" | "blue";
 }) {
   const palette = {
     slate:   { active: "bg-slate-700 text-white",   idle: "text-slate-700 hover:bg-slate-50",    badge: "bg-slate-200 text-slate-700"  },
     red:     { active: "bg-red-600 text-white",     idle: "text-red-700 hover:bg-red-50",        badge: "bg-red-100 text-red-700"       },
     amber:   { active: "bg-amber-500 text-white",   idle: "text-amber-700 hover:bg-amber-50",    badge: "bg-amber-100 text-amber-700"   },
     emerald: { active: "bg-emerald-600 text-white", idle: "text-emerald-700 hover:bg-emerald-50", badge: "bg-emerald-100 text-emerald-700" },
+    blue:    { active: "bg-blue-600 text-white",    idle: "text-blue-700 hover:bg-blue-50",      badge: "bg-blue-100 text-blue-700"     },
   }[color];
   return (
     <button
@@ -318,6 +343,7 @@ function PayableRowEl({ r }: { r: PayableRpcRow }) {
   const remaining = safeNum(r.remaining);
   const diff = safeNum(r.diff);
   const matchPct = safeNum(r.match_pct);
+  const display = displayApStatus(r);
 
   return (
     <tr className={diff < -1 ? "bg-blue-50/40 hover:bg-blue-50" : "hover:bg-slate-50"}>
@@ -351,7 +377,7 @@ function PayableRowEl({ r }: { r: PayableRpcRow }) {
           : "text-emerald-700"
         }`}
       >
-        {diff > 1 ? fmtInt(remaining) : diff < -1 ? `+${fmtInt(-diff)}` : "—"}₮
+        {diff > 1 ? `${fmtInt(remaining)}₮` : diff < -1 ? `+${fmtInt(-diff)}₮` : "—"}
       </td>
       <td className="px-2 py-1.5">
         <div className="h-1.5 bg-slate-100 rounded overflow-hidden w-20">
@@ -363,13 +389,17 @@ function PayableRowEl({ r }: { r: PayableRpcRow }) {
         <div className="text-[0.62rem] text-slate-500 mt-0.5">{matchPct.toFixed(0)}%</div>
       </td>
       <td className="px-2 py-1.5 text-center">
-        {r.status === "paid" ? (
+        {display === "paid" ? (
           <span className="inline-block px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded text-[0.65rem] font-semibold">
             Төлөгдсөн
           </span>
-        ) : r.status === "partial" ? (
+        ) : display === "partial" ? (
           <span className="inline-block px-2 py-0.5 bg-amber-100 text-amber-800 rounded text-[0.65rem] font-semibold">
             Хэсэгчлэн
+          </span>
+        ) : display === "overpaid" ? (
+          <span className="inline-block px-2 py-0.5 bg-blue-100 text-blue-700 rounded text-[0.65rem] font-semibold">
+            Банк илүү
           </span>
         ) : (
           <span className="inline-block px-2 py-0.5 bg-red-100 text-red-700 rounded text-[0.65rem] font-semibold">
