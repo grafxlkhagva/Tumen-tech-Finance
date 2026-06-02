@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { calcSalary } from "@/lib/payroll/calc";
 import { fmtMoney } from "@/lib/format";
 import { SALARY_STATUS } from "@/lib/i18n/labels";
@@ -10,7 +11,10 @@ import { AccountPicker } from "@/components/ui/AccountPicker";
 import {
   recalcPayrollMonth, updateSalaryCell, approveMonth, postSalaryBatch,
 } from "./actions";
-import { Calculator, CheckCircle2, FileText, Zap } from "lucide-react";
+import {
+  Calculator, CheckCircle2, FileText, Coins, HeartPulse, Building2,
+  Percent, HandCoins, Info,
+} from "lucide-react";
 
 type Employee = {
   id: string;
@@ -20,6 +24,7 @@ type Employee = {
   title: string | null;
   base_salary: number;
   phone_allowance: number;
+  adv_base?: number | null;
 };
 
 type Record = {
@@ -39,11 +44,22 @@ type Record = {
   net_pay: number;
 };
 
+const EMP_COLORS = [
+  "#ef4444", "#f59e0b", "#eab308", "#84cc16", "#22c55e",
+  "#10b981", "#14b8a6", "#06b6d4", "#0ea5e9", "#3b82f6",
+  "#6366f1", "#8b5cf6", "#a855f7", "#d946ef", "#ec4899",
+];
+
+function fmtInt(n: number): string {
+  return fmtMoney(n).replace(/\.00$/, "");
+}
+
 export function SalaryGrid({
-  year, month, employees, records,
+  year, month, totalHours, employees, records,
 }: {
   year: number;
   month: number;
+  totalHours: number;
   employees: Employee[];
   records: Record[];
 }) {
@@ -51,10 +67,8 @@ export function SalaryGrid({
   const [pending, startTransition] = useTransition();
   const [msg, setMsg] = useState<string | null>(null);
 
-  // Map records by employee_id
   const recMap = new Map(records.map((r) => [r.employee_id, r]));
 
-  // For batch post
   const [salaryExp, setSalaryExp] = useState("");
   const [salaryPay, setSalaryPay] = useState("");
   const [emndshPay, setEmndshPay] = useState("");
@@ -80,7 +94,7 @@ export function SalaryGrid({
   }
 
   function handleCellChange(recordId: string | null, field: string, value: number) {
-    if (!recordId) return; // record must exist (recalc first)
+    if (!recordId) return;
     startTransition(async () => {
       const r = await updateSalaryCell(recordId, field, value);
       if (r.error) notify(`⚠ ${r.error}`);
@@ -113,27 +127,126 @@ export function SalaryGrid({
     });
   }
 
-  // Totals
-  const totals = records.reduce(
-    (s, r) => ({
-      niit: s.niit + Number(r.total_income || 0),
-      emndsh: s.emndsh + Number(r.emndsh || 0),
-      hhoat: s.hhoat + Number(r.hhoat || 0),
-      adv: s.adv + Number(r.advance || 0),
-      gart: s.gart + Number(r.net_pay || 0),
-    }),
-    { niit: 0, emndsh: 0, hhoat: 0, adv: 0, gart: 0 },
+  // Compute live preview totals from records (so we never desync with DB)
+  const rowPreviews = employees.map((e) => {
+    const rec = recMap.get(e.id);
+    const preview = rec
+      ? calcSalary({
+          base_salary: rec.base_salary,
+          worked_hours: rec.worked_hours,
+          month,
+          phone_allowance: rec.phone_allowance,
+          sales_bonus: rec.sales_bonus,
+          leave_pay: rec.leave_pay,
+          bod_salary: rec.bod_salary,
+          advance_override: rec.advance,
+        })
+      : null;
+    return { e, rec, preview };
+  });
+
+  // NaN-safe number coercion — `Number(undefined)` is NaN which would poison sums.
+  const safeNum = (v: number | null | undefined): number => {
+    const n = Number(v);
+    return Number.isFinite(n) ? n : 0;
+  };
+
+  const totals = rowPreviews.reduce(
+    (s, { rec, preview }) => {
+      if (!rec) return s;
+      return {
+        bod:        s.bod        + (preview?.bod        ?? 0),
+        niit:       s.niit       + (preview?.niit       ?? safeNum(rec.total_income)),
+        emndsh:     s.emndsh     + (preview?.emndsh     ?? safeNum(rec.emndsh)),
+        emndsh_org: s.emndsh_org + (preview?.emndsh_org ?? 0),
+        hhoat:      s.hhoat      + (preview?.hhoat      ?? safeNum(rec.hhoat)),
+        adv:        s.adv        + (preview?.adv        ?? safeNum(rec.advance)),
+        gart:       s.gart       + (preview?.gart       ?? safeNum(rec.net_pay)),
+        count:      s.count + 1,
+      };
+    },
+    { bod: 0, niit: 0, emndsh: 0, emndsh_org: 0, hhoat: 0, adv: 0, gart: 0, count: 0 },
   );
 
   return (
     <div className="space-y-3">
-      {/* Action bar */}
-      <div className="flex items-center justify-between bg-white border border-slate-200 rounded p-3 flex-wrap gap-2">
+      {/* ── Top stat strip (badges) ── */}
+      <div className="flex flex-wrap items-center gap-1.5 print:hidden">
+        <span className="bg-emerald-500 text-white px-2 py-0.5 rounded text-[0.7rem] font-semibold">
+          Нийт орлого: {fmtInt(totals.niit)}₮
+        </span>
+        <span className="bg-red-500 text-white px-2 py-0.5 rounded text-[0.7rem] font-semibold">
+          ЭМНДШ(а): {fmtInt(totals.emndsh)}₮
+        </span>
+        <span className="bg-purple-600 text-white px-2 py-0.5 rounded text-[0.7rem] font-semibold">
+          ЭМНДШ(б): {fmtInt(totals.emndsh_org)}₮
+        </span>
+        <span className="bg-amber-500 text-white px-2 py-0.5 rounded text-[0.7rem] font-semibold">
+          ХХОАТ: {fmtInt(totals.hhoat)}₮
+        </span>
+        <span className="bg-blue-600 text-white px-2 py-0.5 rounded text-[0.7rem] font-semibold">
+          Гарт: {fmtInt(totals.gart)}₮
+        </span>
+      </div>
+
+      {/* ── 5 gradient KPI cards (legacy parity) ── */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2">
+        <KpiCard
+          label="Нийт ЦАЛИНЖИЛТ"
+          value={`${fmtInt(totals.niit)}₮`}
+          sub={`${totals.count} ажилтан`}
+          icon={<Coins className="w-5 h-5" />}
+          gradient="from-blue-500 to-blue-700"
+        />
+        <KpiCard
+          label="ЭМНДШ — АЖИЛТАН"
+          value={`${fmtInt(totals.emndsh)}₮`}
+          sub="11.5% сууттгал"
+          icon={<HeartPulse className="w-5 h-5" />}
+          gradient="from-red-500 to-red-700"
+        />
+        <KpiCard
+          label="ЭМНДШ — БАЙГУУЛЛАГА"
+          value={`${fmtInt(totals.emndsh_org)}₮`}
+          sub="12.5% нэмж төлнө"
+          icon={<Building2 className="w-5 h-5" />}
+          gradient="from-purple-600 to-fuchsia-700"
+        />
+        <KpiCard
+          label="ХХОАТ"
+          value={`${fmtInt(totals.hhoat)}₮`}
+          sub="10% орлогын татвар"
+          icon={<Percent className="w-5 h-5" />}
+          gradient="from-orange-500 to-orange-700"
+        />
+        <KpiCard
+          label="ГАРТ ОЛГОХ"
+          value={`${fmtInt(totals.gart)}₮`}
+          sub="Урьдчилгаа хасч"
+          icon={<HandCoins className="w-5 h-5" />}
+          gradient="from-emerald-500 to-emerald-700"
+        />
+      </div>
+
+      {/* ── Org-cost banner ── */}
+      <div className="bg-fuchsia-50 border border-fuchsia-200 rounded p-2.5 text-sm flex items-center gap-2 print:hidden">
+        <Calculator className="w-4 h-4 text-purple-700 shrink-0" />
+        <strong className="text-slate-800">Байгууллагын нийт цалингийн зардал:</strong>
+        <span className="font-bold font-mono text-purple-800">
+          {fmtInt(totals.niit + totals.emndsh_org)}₮
+        </span>
+        <span className="text-xs text-slate-500">
+          (Нийт орлого + Байгууллагын ЭМНДШ {fmtInt(totals.emndsh_org)}₮)
+        </span>
+      </div>
+
+      {/* ── Action bar ── */}
+      <div className="flex items-center justify-between bg-white border border-slate-200 rounded p-2 flex-wrap gap-2 print:hidden">
         <div className="flex gap-2">
           <button
             onClick={handleRecalc}
             disabled={pending}
-            className="border border-blue-300 bg-blue-50 hover:bg-blue-100 text-blue-700 px-3 py-1.5 rounded text-sm flex items-center gap-1.5 disabled:opacity-60"
+            className="border border-blue-300 bg-blue-50 hover:bg-blue-100 text-blue-700 px-3 py-1.5 rounded text-xs flex items-center gap-1.5 disabled:opacity-60"
           >
             <Calculator className="w-3.5 h-3.5" /> Тооцоолох / Сэргээх
           </button>
@@ -141,7 +254,7 @@ export function SalaryGrid({
             <button
               onClick={handleApprove}
               disabled={pending}
-              className="bg-yellow-500 hover:bg-yellow-600 text-white px-3 py-1.5 rounded text-sm flex items-center gap-1.5 disabled:opacity-60"
+              className="bg-yellow-500 hover:bg-yellow-600 text-white px-3 py-1.5 rounded text-xs flex items-center gap-1.5 disabled:opacity-60"
             >
               <CheckCircle2 className="w-3.5 h-3.5" /> Баталгаажуулах
             </button>
@@ -149,19 +262,19 @@ export function SalaryGrid({
           {records.length > 0 && allApproved && !showPostForm && (
             <button
               onClick={() => setShowPostForm(true)}
-              className="bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 rounded text-sm flex items-center gap-1.5"
+              className="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded text-xs flex items-center gap-1.5"
             >
               <FileText className="w-3.5 h-3.5" /> Журналд оруулах
             </button>
           )}
-          {allPosted && <Badge color="bg-green-100 text-green-700">Журналд орсон</Badge>}
+          {allPosted && <Badge color="bg-emerald-100 text-emerald-700">Журналд орсон</Badge>}
         </div>
         {msg && <span className="text-xs text-slate-600">{msg}</span>}
       </div>
 
-      {/* Batch post form */}
+      {/* ── Batch-post form ── */}
       {showPostForm && (
-        <div className="bg-white border border-green-200 rounded p-4 space-y-3">
+        <div className="bg-white border border-emerald-200 rounded p-4 space-y-3">
           <h3 className="text-sm font-semibold">Журналд оруулах — дансууд</h3>
           <div className="grid grid-cols-2 gap-3">
             <div>
@@ -183,143 +296,241 @@ export function SalaryGrid({
           </div>
           <div className="flex justify-end gap-2">
             <button onClick={() => setShowPostForm(false)} className="px-3 py-1.5 border border-slate-300 rounded text-xs">Цуцлах</button>
-            <button onClick={handlePost} disabled={pending} className="bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 rounded text-xs disabled:opacity-60">
+            <button onClick={handlePost} disabled={pending} className="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded text-xs disabled:opacity-60">
               {pending ? "Оруулж байна..." : "Батлах + Журналд оруулах"}
             </button>
           </div>
         </div>
       )}
 
-      {/* Grid */}
-      <div className="bg-white rounded-lg border border-slate-200 overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead className="bg-slate-50 text-xs uppercase text-slate-500">
-            <tr>
-              <th className="px-2 py-2 text-left min-w-[180px]">Ажилтан</th>
-              <th className="px-2 py-2 text-right w-20">Цаг</th>
-              <th className="px-2 py-2 text-right w-24">Утас</th>
-              <th className="px-2 py-2 text-right w-24">Бонус</th>
-              <th className="px-2 py-2 text-right w-24">Чөлөө</th>
-              <th className="px-2 py-2 text-right w-28">Нийт</th>
-              <th className="px-2 py-2 text-right w-24">ЭМНДШ</th>
-              <th className="px-2 py-2 text-right w-24">ХХОАТ</th>
-              <th className="px-2 py-2 text-right w-28">Аванс</th>
-              <th className="px-2 py-2 text-right w-28">Гарт</th>
-              <th className="px-2 py-2 text-center w-20">Статус</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100">
-            {employees.map((e) => {
-              const rec = recMap.get(e.id);
-              // Live preview (recompute using TS twin) — DB updates async
-              const preview = rec
-                ? calcSalary({
-                    base_salary: rec.base_salary,
-                    worked_hours: rec.worked_hours,
-                    month,
-                    phone_allowance: rec.phone_allowance,
-                    sales_bonus: rec.sales_bonus,
-                    leave_pay: rec.leave_pay,
-                    bod_salary: rec.bod_salary,
-                    advance_override: rec.advance,
-                  })
-                : null;
-              return (
-                <tr key={e.id} className="hover:bg-slate-50">
-                  <td className="px-2 py-2">
-                    <div className="text-sm">{e.full_name}</div>
-                    {e.title && <div className="text-[0.65rem] text-slate-500">{e.title}</div>}
-                  </td>
-                  <td className="px-2 py-2">
-                    <input
-                      type="number" step="0.5" defaultValue={rec?.worked_hours ?? 176}
-                      onBlur={(ev) => {
-                        const v = Number(ev.target.value);
-                        if (rec && v !== rec.worked_hours) handleCellChange(rec.id, "worked_hours", v);
-                      }}
-                      className="w-20 px-1.5 py-1 border border-slate-300 rounded text-right text-xs font-mono"
-                    />
-                  </td>
-                  <td className="px-2 py-2">
-                    <input
-                      type="number" step="1" defaultValue={rec?.phone_allowance ?? e.phone_allowance ?? 0}
-                      onBlur={(ev) => {
-                        const v = Number(ev.target.value);
-                        if (rec && v !== rec.phone_allowance) handleCellChange(rec.id, "phone_allowance", v);
-                      }}
-                      className="w-24 px-1.5 py-1 border border-slate-300 rounded text-right text-xs font-mono"
-                    />
-                  </td>
-                  <td className="px-2 py-2">
-                    <input
-                      type="number" step="1" defaultValue={rec?.sales_bonus ?? 0}
-                      onBlur={(ev) => {
-                        const v = Number(ev.target.value);
-                        if (rec && v !== rec.sales_bonus) handleCellChange(rec.id, "sales_bonus", v);
-                      }}
-                      className="w-24 px-1.5 py-1 border border-slate-300 rounded text-right text-xs font-mono"
-                    />
-                  </td>
-                  <td className="px-2 py-2">
-                    <input
-                      type="number" step="1" defaultValue={rec?.leave_pay ?? 0}
-                      onBlur={(ev) => {
-                        const v = Number(ev.target.value);
-                        if (rec && v !== rec.leave_pay) handleCellChange(rec.id, "leave_pay", v);
-                      }}
-                      className="w-24 px-1.5 py-1 border border-slate-300 rounded text-right text-xs font-mono"
-                    />
-                  </td>
-                  <td className="px-2 py-2 font-mono text-right text-xs font-semibold">
-                    {fmtMoney(preview?.niit ?? rec?.total_income ?? 0)}
-                  </td>
-                  <td className="px-2 py-2 font-mono text-right text-xs text-red-600">
-                    {fmtMoney(preview?.emndsh ?? rec?.emndsh ?? 0)}
-                  </td>
-                  <td className="px-2 py-2 font-mono text-right text-xs text-red-600">
-                    {fmtMoney(preview?.hhoat ?? rec?.hhoat ?? 0)}
-                  </td>
-                  <td className="px-2 py-2">
-                    <input
-                      type="number" step="1" defaultValue={rec?.advance ?? 0}
-                      onBlur={(ev) => {
-                        const v = Number(ev.target.value);
-                        if (rec && v !== rec.advance) handleCellChange(rec.id, "advance", v);
-                      }}
-                      className="w-28 px-1.5 py-1 border border-slate-300 rounded text-right text-xs font-mono"
-                    />
-                  </td>
-                  <td className="px-2 py-2 font-mono text-right text-xs font-bold text-green-700">
-                    {fmtMoney(preview?.gart ?? rec?.net_pay ?? 0)}
-                  </td>
-                  <td className="px-2 py-2 text-center">
-                    {rec ? (
-                      <Badge color={
-                        rec.status === "posted" ? "bg-green-100 text-green-700"
-                        : rec.status === "approved" ? "bg-yellow-100 text-yellow-800"
-                        : "bg-slate-200 text-slate-700"
-                      }>{SALARY_STATUS[rec.status as keyof typeof SALARY_STATUS]}</Badge>
-                    ) : (
-                      <span className="text-[0.65rem] text-slate-400">—</span>
-                    )}
+      {/* ── Salary grid table ── */}
+      <div className="bg-white rounded border border-slate-200 overflow-hidden">
+        <div className="px-3 py-2 text-white text-sm font-semibold flex items-center gap-1.5" style={{ background: "#1a3c5e" }}>
+          <FileText className="w-4 h-4" />
+          {year} оны {month}-р сарын цалингийн бүртгэл
+          <span className="ml-2 px-2 py-0.5 bg-white/20 rounded text-xs">{employees.length}</span>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs">
+            {/* Grouped headers (rowspan/colspan) */}
+            <thead style={{ background: "#263238", color: "#fff" }}>
+              <tr>
+                <th rowSpan={2} className="px-2 py-1.5 text-left font-semibold" style={{ minWidth: 160 }}>Ажилтан</th>
+                <th rowSpan={2} className="px-2 py-1.5 text-right font-semibold" style={{ width: 100 }}>Үндсэн цалин</th>
+                <th rowSpan={2} className="px-2 py-1.5 text-center font-semibold" style={{ width: 90 }}>
+                  Ажилласан ц <span className="opacity-60 text-[0.6rem]">/{totalHours}ц</span>
+                </th>
+                <th rowSpan={2} className="px-2 py-1.5 text-right font-semibold" style={{ width: 90 }}>Борлуулалт</th>
+                <th rowSpan={2} className="px-2 py-1.5 text-right font-semibold" style={{ width: 90 }}>ЭА нэмэгдэл</th>
+                <th colSpan={2} className="px-2 py-1.5 text-center font-semibold" style={{ color: "#81d4fa", borderBottom: "1px solid #455a64" }}>
+                  Нийт орлого
+                </th>
+                <th colSpan={2} className="px-2 py-1.5 text-center font-semibold" style={{ color: "#ef9a9a", borderBottom: "1px solid #455a64" }}>
+                  Суутгал
+                </th>
+                <th rowSpan={2} className="px-2 py-1.5 text-right font-semibold" style={{ width: 100, color: "#ffcc80" }}>Урьдчилгаа</th>
+                <th rowSpan={2} className="px-2 py-1.5 text-right font-semibold" style={{ width: 100, color: "#a5d6a7" }}>Гарт авах</th>
+                <th rowSpan={2} className="px-2 py-1.5 text-center font-semibold print:hidden" style={{ width: 50 }}>Статус</th>
+              </tr>
+              <tr>
+                <th className="px-2 py-1.5 text-right font-semibold" style={{ color: "#81d4fa", width: 100 }}>Бодогдсон</th>
+                <th className="px-2 py-1.5 text-right font-semibold" style={{ color: "#81d4fa", width: 100 }}>Нийт</th>
+                <th className="px-2 py-1.5 text-right font-semibold" style={{ color: "#ef9a9a", width: 90 }}>ЭМНДШ</th>
+                <th className="px-2 py-1.5 text-right font-semibold" style={{ color: "#ef9a9a", width: 90 }}>ХХОАТ</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {rowPreviews.length === 0 ? (
+                <tr>
+                  <td colSpan={12} className="text-center py-10 text-slate-400">
+                    Ажилтан байхгүй байна.
                   </td>
                 </tr>
-              );
-            })}
-            {records.length > 0 && (
-              <tr className="bg-slate-100 font-semibold">
-                <td colSpan={5} className="px-2 py-2 text-right text-xs uppercase">Нийт</td>
-                <td className="px-2 py-2 font-mono text-right">{fmtMoney(totals.niit)}</td>
-                <td className="px-2 py-2 font-mono text-right">{fmtMoney(totals.emndsh)}</td>
-                <td className="px-2 py-2 font-mono text-right">{fmtMoney(totals.hhoat)}</td>
-                <td className="px-2 py-2 font-mono text-right">{fmtMoney(totals.adv)}</td>
-                <td className="px-2 py-2 font-mono text-right">{fmtMoney(totals.gart)}</td>
-                <td></td>
-              </tr>
+              ) : (
+                rowPreviews.map(({ e, rec, preview }, idx) => {
+                  const color = EMP_COLORS[idx % EMP_COLORS.length];
+                  // Use the live preview when we have a record; fall back to
+                  // raw DB columns. NaN-safe via the outer `safeNum` helper.
+                  const niitVal   = preview?.niit   ?? safeNum(rec?.total_income);
+                  const bodVal    = preview?.bod    ?? safeNum(rec?.bod_salary);
+                  const emndshVal = preview?.emndsh ?? safeNum(rec?.emndsh);
+                  const hhoatVal  = preview?.hhoat  ?? safeNum(rec?.hhoat);
+                  const ded23Val  = preview?.ded23  ?? 0;
+                  const advVal    = preview?.adv    ?? safeNum(rec?.advance);
+                  const gartVal   = preview?.gart   ?? safeNum(rec?.net_pay);
+                  const workedPct = totalHours > 0 ? ((rec?.worked_hours ?? totalHours) / totalHours) * 100 : 0;
+                  return (
+                    <tr key={e.id} className="hover:bg-slate-50">
+                      <td className="px-2 py-1.5">
+                        <div className="flex items-start gap-1.5">
+                          <span
+                            className="inline-block rounded-full mt-1 shrink-0"
+                            style={{ width: 9, height: 9, background: color }}
+                          />
+                          <div>
+                            <Link
+                              href={`/salary/employees/${e.id}/edit`}
+                              className="font-semibold text-slate-800 hover:text-blue-700 hover:underline text-[0.78rem]"
+                            >
+                              {e.full_name}
+                            </Link>
+                            {e.title && <div className="text-[0.65rem] text-slate-500">{e.title}</div>}
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-2 py-1.5 text-right font-mono">{fmtInt(e.base_salary)}</td>
+                      <td className="px-2 py-1.5 text-center">
+                        <input
+                          type="number" min="0" max="300" step="0.5"
+                          defaultValue={rec?.worked_hours ?? totalHours}
+                          onBlur={(ev) => {
+                            const v = Number(ev.target.value);
+                            if (rec && v !== rec.worked_hours) handleCellChange(rec.id, "worked_hours", v);
+                          }}
+                          disabled={!rec}
+                          className="w-16 px-1 py-0.5 border border-slate-300 rounded text-right text-xs font-mono disabled:bg-slate-50"
+                        />
+                        <div className="text-[0.62rem] text-slate-400 mt-0.5">{workedPct.toFixed(0)}%</div>
+                      </td>
+                      <td className="px-2 py-1.5 text-right">
+                        <input
+                          type="number" min="0" step="1000"
+                          defaultValue={rec?.sales_bonus ?? 0}
+                          onBlur={(ev) => {
+                            const v = Number(ev.target.value);
+                            if (rec && v !== rec.sales_bonus) handleCellChange(rec.id, "sales_bonus", v);
+                          }}
+                          disabled={!rec}
+                          placeholder="0"
+                          className="w-20 px-1 py-0.5 border border-slate-300 rounded text-right text-xs font-mono disabled:bg-slate-50"
+                        />
+                      </td>
+                      <td className="px-2 py-1.5 text-right">
+                        <input
+                          type="number" min="0" step="1000"
+                          defaultValue={rec?.leave_pay || ""}
+                          onBlur={(ev) => {
+                            const v = Number(ev.target.value);
+                            if (rec && v !== rec.leave_pay) handleCellChange(rec.id, "leave_pay", v);
+                          }}
+                          disabled={!rec}
+                          placeholder="0"
+                          className="w-20 px-1 py-0.5 border border-slate-300 rounded text-right text-xs font-mono disabled:bg-slate-50"
+                        />
+                      </td>
+                      <td className="px-2 py-1.5 text-right font-mono" style={{ color: "#0277bd" }}>
+                        {fmtInt(bodVal)}
+                      </td>
+                      <td className="px-2 py-1.5 text-right font-mono font-bold" style={{ color: "#0277bd" }}>
+                        {fmtInt(niitVal)}
+                      </td>
+                      <td className="px-2 py-1.5 text-right font-mono" style={{ color: "#c62828" }}>
+                        {fmtInt(emndshVal)}
+                      </td>
+                      <td className="px-2 py-1.5 text-right font-mono" style={{ color: "#c62828" }}>
+                        <div>{fmtInt(hhoatVal)}</div>
+                        {ded23Val > 0 && (
+                          <div className="text-[0.6rem] text-slate-400 font-normal">хөнгөлт: {fmtInt(ded23Val)}</div>
+                        )}
+                      </td>
+                      <td className="px-2 py-1.5 text-right" style={{ color: "#e65100" }}>
+                        <input
+                          type="number" min="0" step="1000"
+                          defaultValue={rec?.advance ?? 0}
+                          onBlur={(ev) => {
+                            const v = Number(ev.target.value);
+                            if (rec && v !== rec.advance) handleCellChange(rec.id, "advance", v);
+                          }}
+                          disabled={!rec}
+                          className="w-24 px-1 py-0.5 border border-slate-300 rounded text-right text-xs font-mono disabled:bg-slate-50"
+                          style={{ color: "#e65100" }}
+                        />
+                        <div className="text-[0.6rem] text-slate-400 mt-0.5">
+                          {e.adv_base ? "тогтмол" : "40%"}
+                        </div>
+                      </td>
+                      <td className="px-2 py-1.5 text-right font-mono font-bold" style={{ color: gartVal >= 0 ? "#2e7d32" : "#c62828" }}>
+                        {fmtInt(gartVal)}₮
+                      </td>
+                      <td className="px-2 py-1.5 text-center print:hidden">
+                        {rec ? (
+                          <Badge color={
+                            rec.status === "posted" ? "bg-emerald-100 text-emerald-700"
+                            : rec.status === "approved" ? "bg-yellow-100 text-yellow-800"
+                            : "bg-slate-200 text-slate-700"
+                          }>{SALARY_STATUS[rec.status as keyof typeof SALARY_STATUS]}</Badge>
+                        ) : (
+                          <span className="text-slate-300" title="Recalc хийгээгүй">
+                            <Info className="w-3 h-3 inline" />
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+            {totals.count > 0 && (
+              <tfoot className="text-white font-bold" style={{ background: "#263238" }}>
+                <tr>
+                  <td colSpan={5} className="px-2 py-1.5 text-right text-[0.7rem]">
+                    Нийт {totals.count} ажилтан:
+                  </td>
+                  <td className="px-2 py-1.5 text-right font-mono text-[0.72rem]" style={{ color: "#81d4fa" }}>
+                    {fmtInt(totals.bod)}
+                  </td>
+                  <td className="px-2 py-1.5 text-right font-mono text-[0.72rem]" style={{ color: "#81d4fa" }}>
+                    {fmtInt(totals.niit)}₮
+                  </td>
+                  <td className="px-2 py-1.5 text-right font-mono text-[0.72rem]" style={{ color: "#ef9a9a" }}>
+                    {fmtInt(totals.emndsh)}₮
+                  </td>
+                  <td className="px-2 py-1.5 text-right font-mono text-[0.72rem]" style={{ color: "#ef9a9a" }}>
+                    {fmtInt(totals.hhoat)}₮
+                  </td>
+                  <td className="px-2 py-1.5 text-right font-mono text-[0.72rem]" style={{ color: "#ffcc80" }}>
+                    {fmtInt(totals.adv)}₮
+                  </td>
+                  <td className="px-2 py-1.5 text-right font-mono text-[0.72rem]" style={{ color: "#a5d6a7" }}>
+                    {fmtInt(totals.gart)}₮
+                  </td>
+                  <td className="print:hidden"></td>
+                </tr>
+              </tfoot>
             )}
-          </tbody>
-        </table>
+          </table>
+        </div>
       </div>
+
+      <style>{`
+        @media print {
+          @page { size: A4 landscape; margin: 8mm; }
+          body { background: white; }
+          table { font-size: 7.5pt !important; }
+          input { border: none !important; background: transparent !important; }
+        }
+      `}</style>
+    </div>
+  );
+}
+
+function KpiCard({
+  label, value, sub, icon, gradient,
+}: {
+  label: string;
+  value: string;
+  sub: React.ReactNode;
+  icon: React.ReactNode;
+  gradient: string;
+}) {
+  return (
+    <div className={`bg-gradient-to-br ${gradient} text-white rounded p-3 shadow-sm`}>
+      <div className="flex items-center justify-between mb-1">
+        <div className="text-[0.65rem] opacity-90 uppercase tracking-wide font-semibold">{label}</div>
+        {icon}
+      </div>
+      <div className="text-lg font-bold font-mono leading-tight">{value}</div>
+      <div className="text-[0.65rem] opacity-80 mt-0.5">{sub}</div>
     </div>
   );
 }
