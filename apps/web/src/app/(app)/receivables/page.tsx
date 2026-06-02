@@ -1,128 +1,320 @@
 import { createClient } from "@/lib/supabase/server";
+import { getCurrentCompany } from "@/lib/supabase/company";
 import Link from "next/link";
-import { HandCoins, Plus } from "lucide-react";
-import { fmtDate, fmtMoney } from "@/lib/format";
-import { Pagination } from "@/components/ui/Pagination";
+import {
+  HandCoins, FileText, CheckCircle2, Clock, Plus, AlertTriangle, Info, Eye,
+} from "lucide-react";
+import { fmtMoney } from "@/lib/format";
 import { ToastFromURL } from "@/components/ui/Toast";
-import { Badge } from "@/components/ui/Badge";
-import { AR_AP_STATUS, AR_AP_STATUS_COLOR, type ArApStatus } from "@/lib/i18n/labels";
+import {
+  type ReceivableRpcRow,
+  buildReceivableSummary,
+  parseArStatus,
+} from "@/lib/reports/receivables";
 
-export const metadata = { title: "Авлага — Тумэн Accounting" };
+export const metadata = { title: "Авлагын бүртгэл — Тумэн Accounting" };
 
-const PAGE_SIZE = 50;
+type SearchParams = Promise<{ status?: string }>;
 
-type SearchParams = Promise<{ page?: string; status?: string }>;
+function fmtInt(n: number): string {
+  return fmtMoney(n).replace(/\.00$/, "");
+}
 
-export default async function ReceivablesPage({ searchParams }: { searchParams: SearchParams }) {
+export default async function ReceivablesPage({
+  searchParams,
+}: {
+  searchParams: SearchParams;
+}) {
   const sp = await searchParams;
-  const pageNum = Math.max(1, parseInt(sp.page || "1", 10));
-  const offset = (pageNum - 1) * PAGE_SIZE;
+  const status = parseArStatus(sp.status);
 
   const supabase = await createClient();
-  let q = supabase
-    .from("receivables")
-    .select("id, invoice_no, invoice_date, due_date, amount, vat_amount, total_amount, paid_amount, remaining, status, responsible, partner:partners(id, name)", { count: "exact" })
-    .is("deleted_at", null)
-    .order("invoice_date", { ascending: false })
-    .range(offset, offset + PAGE_SIZE - 1);
+  const company = await getCurrentCompany(supabase);
 
-  if (sp.status) {
-    q = q.eq("status", sp.status as "draft" | "open" | "partial" | "paid" | "overdue" | "cancelled" | "written_off");
+  if (!company) {
+    return (
+      <div className="max-w-5xl mx-auto p-8">
+        <h1 className="text-2xl font-semibold flex items-center gap-2 mb-4">
+          <HandCoins className="w-6 h-6" /> Авлагын бүртгэл
+        </h1>
+        <div className="bg-amber-50 border border-amber-200 rounded p-4 text-sm text-amber-900">
+          Байгууллага сонгогдоогүй байна.
+        </div>
+      </div>
+    );
   }
 
-  const { data: rows, count } = await q;
-  const totalPages = Math.ceil((count ?? 0) / PAGE_SIZE);
+  // Pull the FULL set (no status filter) so the chip counts are accurate;
+  // narrow on the client below.
+  const { data, error } = await supabase.rpc("fn_receivables_by_partner", {
+    p_company_id: company.companyId,
+    p_status: null,
+  });
 
-  // Totals
-  const totals = (rows ?? []).reduce(
-    (acc, r) => {
-      acc.total += Number(r.total_amount || 0);
-      acc.paid += Number(r.paid_amount || 0);
-      acc.remaining += Number(r.remaining || 0);
-      return acc;
-    },
-    { total: 0, paid: 0, remaining: 0 },
-  );
+  const allRows = (data ?? []) as ReceivableRpcRow[];
+  const summary = buildReceivableSummary(allRows);
+  const filtered = status ? allRows.filter((r) => r.status === status) : allRows;
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3 max-w-[1600px] mx-auto">
       <ToastFromURL />
 
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold text-slate-900 flex items-center gap-2">
-            <HandCoins className="w-6 h-6" /> Авлага
-          </h1>
-          <p className="text-sm text-slate-500">
-            {count ?? 0} нэхэмжлэл · Нийт <span className="font-mono">{fmtMoney(totals.total)}</span> · Төлсөн <span className="font-mono">{fmtMoney(totals.paid)}</span> · Үлдэгдэл <span className="font-mono">{fmtMoney(totals.remaining)}</span>
-          </p>
-        </div>
-        <Link href="/receivables/new" className="bg-slate-900 hover:bg-slate-800 text-white px-3 py-2 rounded text-sm font-medium flex items-center gap-2">
-          <Plus className="w-4 h-4" /> Шинэ авлага
+      {/* Toolbar */}
+      <div className="flex items-center justify-between flex-wrap gap-2 print:hidden">
+        <h1 className="text-2xl font-semibold text-slate-900 flex items-center gap-2">
+          <HandCoins className="w-6 h-6" /> Авлагын бүртгэл
+        </h1>
+        <Link
+          href="/receivables/new"
+          className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded text-xs flex items-center gap-1"
+        >
+          <Plus className="w-3.5 h-3.5" /> Авлага нэмэх
         </Link>
       </div>
 
-      {/* Status filter */}
-      <div className="flex gap-2 text-xs">
-        <Link href="/receivables" className={`px-3 py-1 rounded ${!sp.status ? "bg-slate-900 text-white" : "bg-white border border-slate-200 hover:bg-slate-50"}`}>Бүгд</Link>
-        {Object.entries(AR_AP_STATUS).map(([v, l]) => (
-          <Link key={v} href={`/receivables?status=${v}`}
-            className={`px-3 py-1 rounded ${sp.status === v ? "bg-slate-900 text-white" : "bg-white border border-slate-200 hover:bg-slate-50"}`}>
-            {l}
-          </Link>
-        ))}
+      {/* 3 KPI gradient cards (legacy parity) */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <KpiCard
+          label="НИЙТ НЭХЭМЖЛЭЛ"
+          value={`${fmtInt(summary.totals.invoiced)}₮`}
+          sub={`${summary.cnt.total} харилцагч`}
+          icon={<FileText className="w-5 h-5" />}
+          gradient="from-blue-500 to-blue-700"
+        />
+        <KpiCard
+          label="ЦУГЛАСАН ОРЛОГО"
+          value={`${fmtInt(summary.totals.collected)}₮`}
+          sub="Банкны орлогоор"
+          icon={<CheckCircle2 className="w-5 h-5" />}
+          gradient="from-emerald-500 to-emerald-700"
+        />
+        <KpiCard
+          label="ҮЛДЭГДЭЛ АВЛАГА"
+          value={`${fmtInt(summary.totals.remaining)}₮`}
+          sub="Үлдэгдэлтэй"
+          icon={<Clock className="w-5 h-5" />}
+          gradient={summary.totals.remaining > 0
+            ? "from-orange-500 to-orange-700"
+            : "from-emerald-500 to-emerald-700"}
+        />
       </div>
 
-      <div className="bg-white rounded-lg border border-slate-200 overflow-hidden">
-        <table className="w-full text-sm">
-          <thead className="bg-slate-50 text-xs uppercase text-slate-500">
-            <tr>
-              <th className="px-3 py-2 text-left">Нэхэмж №</th>
-              <th className="px-3 py-2 text-left">Огноо</th>
-              <th className="px-3 py-2 text-left">Хугацаа</th>
-              <th className="px-3 py-2 text-left">Харилцагч</th>
-              <th className="px-3 py-2 text-right">Нийт</th>
-              <th className="px-3 py-2 text-right">Төлсөн</th>
-              <th className="px-3 py-2 text-right">Үлдэгдэл</th>
-              <th className="px-3 py-2 text-center">Статус</th>
-              <th className="px-3 py-2 text-left">Хариуцагч</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100">
-            {(rows ?? []).map((r) => {
-              const partner = Array.isArray(r.partner) ? r.partner[0] : r.partner;
-              return (
-                <tr key={r.id} className="hover:bg-slate-50">
-                  <td className="px-3 py-2 font-mono text-xs">
-                    <Link href={`/receivables/${r.id}/edit`} className="text-blue-600 hover:underline">{r.invoice_no || "—"}</Link>
+      {/* Status chips + info */}
+      <div className="bg-white border border-slate-200 rounded p-2 flex items-center flex-wrap gap-2 print:hidden">
+        <div className="inline-flex rounded border border-slate-300 overflow-hidden text-xs">
+          <Chip
+            label="Бүгд"
+            count={summary.cnt.total}
+            active={!status}
+            href="/receivables"
+            color="slate"
+          />
+          <Chip
+            label="Нээлттэй"
+            count={summary.cnt.open}
+            active={status === "open"}
+            href="/receivables?status=open"
+            color="red"
+          />
+          <Chip
+            label="Хэсэгчлэн"
+            count={summary.cnt.partial}
+            active={status === "partial"}
+            href="/receivables?status=partial"
+            color="amber"
+          />
+          <Chip
+            label="Төлөгдсөн"
+            count={summary.cnt.paid}
+            active={status === "paid"}
+            href="/receivables?status=paid"
+            color="emerald"
+          />
+        </div>
+        <span className="text-xs text-slate-500 flex items-center gap-1">
+          <Info className="w-3 h-3" />
+          E-Баримт нэхэмжлэл + банкны орлогоос автоматаар тооцоолсон
+        </span>
+      </div>
+
+      {error && (
+        <div className="bg-red-50 border border-red-200 rounded p-3 text-sm text-red-800 flex items-start gap-2 print:hidden">
+          <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
+          <div>
+            <div className="font-semibold">Өгөгдөл татаж чадсангүй</div>
+            <div className="text-xs opacity-80 mt-0.5">{error.message}</div>
+          </div>
+        </div>
+      )}
+
+      {/* Table */}
+      <div className="bg-white border border-slate-200 rounded overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs">
+            <thead className="bg-slate-800 text-white">
+              <tr>
+                <th className="px-2 py-2 text-left font-semibold w-28">Код</th>
+                <th className="px-2 py-2 text-left font-semibold">Харилцагч</th>
+                <th className="px-2 py-2 text-left font-semibold w-28">Регистр</th>
+                <th className="px-2 py-2 text-right font-semibold w-36">E-Баримт дүн</th>
+                <th className="px-2 py-2 text-right font-semibold w-32">Цугласан</th>
+                <th className="px-2 py-2 text-right font-semibold w-32">Үлдэгдэл</th>
+                <th className="px-2 py-2 text-left font-semibold w-28">Тулгалт</th>
+                <th className="px-2 py-2 text-center font-semibold w-24">Төлөв</th>
+                <th className="px-2 py-2 text-center font-semibold w-14 print:hidden"></th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {filtered.length === 0 ? (
+                <tr>
+                  <td colSpan={9} className="text-center py-10 text-slate-400">
+                    <FileText className="w-8 h-8 mx-auto opacity-30 mb-2" />
+                    Бичлэг олдсонгүй
                   </td>
-                  <td className="px-3 py-2 text-xs">{fmtDate(r.invoice_date)}</td>
-                  <td className="px-3 py-2 text-xs text-slate-500">{fmtDate(r.due_date)}</td>
-                  <td className="px-3 py-2 text-xs">
-                    {partner ? (
-                      <Link href={`/partners/${partner.id}`} className="text-blue-600 hover:underline">{partner.name}</Link>
-                    ) : "—"}
-                  </td>
-                  <td className="px-3 py-2 font-mono text-right text-xs">{fmtMoney(r.total_amount)}</td>
-                  <td className="px-3 py-2 font-mono text-right text-xs text-green-700">{fmtMoney(r.paid_amount)}</td>
-                  <td className="px-3 py-2 font-mono text-right text-xs font-semibold">{fmtMoney(r.remaining)}</td>
-                  <td className="px-3 py-2 text-center">
-                    <Badge color={AR_AP_STATUS_COLOR[r.status as ArApStatus]}>
-                      {AR_AP_STATUS[r.status as ArApStatus]}
-                    </Badge>
-                  </td>
-                  <td className="px-3 py-2 text-xs">{r.responsible || "—"}</td>
                 </tr>
-              );
-            })}
-            {(rows?.length ?? 0) === 0 && (
-              <tr><td colSpan={9} className="px-4 py-8 text-center text-xs text-slate-400">Бичлэг олдсонгүй</td></tr>
+              ) : (
+                filtered.map((r) => <ReceivableRowEl key={r.partner_id} r={r} />)
+              )}
+            </tbody>
+            {filtered.length > 0 && (
+              <tfoot className="bg-blue-50 font-bold">
+                <tr>
+                  <td colSpan={3} className="px-2 py-1.5 text-right">
+                    Нийт {filtered.length} харилцагч:
+                  </td>
+                  <td className="px-2 py-1.5 text-right font-mono">
+                    {fmtInt(filtered.reduce((s, r) => s + Number(r.invoiced), 0))}₮
+                  </td>
+                  <td className="px-2 py-1.5 text-right font-mono text-emerald-700">
+                    {fmtInt(filtered.reduce((s, r) => s + Number(r.collected), 0))}₮
+                  </td>
+                  <td className="px-2 py-1.5 text-right font-mono text-red-700">
+                    {fmtInt(filtered.reduce((s, r) => s + Number(r.remaining), 0))}₮
+                  </td>
+                  <td colSpan={3}></td>
+                </tr>
+              </tfoot>
             )}
-          </tbody>
-        </table>
+          </table>
+        </div>
       </div>
+    </div>
+  );
+}
 
-      <Pagination page={pageNum} totalPages={totalPages} basePath="/receivables" search={sp} />
+function Chip({
+  label, count, active, href, color,
+}: {
+  label: string;
+  count: number;
+  active: boolean;
+  href: string;
+  color: "slate" | "red" | "amber" | "emerald";
+}) {
+  const palette = {
+    slate:   { active: "bg-slate-700 text-white",   idle: "text-slate-700 hover:bg-slate-50",    badge: "bg-slate-200 text-slate-700"   },
+    red:     { active: "bg-red-600 text-white",     idle: "text-red-700 hover:bg-red-50",        badge: "bg-red-100 text-red-700"        },
+    amber:   { active: "bg-amber-500 text-white",   idle: "text-amber-700 hover:bg-amber-50",    badge: "bg-amber-100 text-amber-700"    },
+    emerald: { active: "bg-emerald-600 text-white", idle: "text-emerald-700 hover:bg-emerald-50", badge: "bg-emerald-100 text-emerald-700" },
+  }[color];
+  return (
+    <Link
+      href={href}
+      className={`px-3 py-1 flex items-center gap-1 border-r border-slate-200 last:border-r-0 ${active ? palette.active : palette.idle}`}
+    >
+      {label}
+      <span className={`px-1.5 py-0.5 rounded text-[0.65rem] ${active ? "bg-white/25" : palette.badge}`}>
+        {count}
+      </span>
+    </Link>
+  );
+}
+
+function ReceivableRowEl({ r }: { r: ReceivableRpcRow }) {
+  const invoiced = Number(r.invoiced);
+  const collected = Number(r.collected);
+  const remaining = Number(r.remaining);
+  const matchPct = Number(r.match_pct);
+
+  return (
+    <tr className="hover:bg-slate-50">
+      <td className="px-2 py-1.5 text-slate-500 font-mono text-[0.72rem]">
+        {r.partner_code || "—"}
+      </td>
+      <td className="px-2 py-1.5">
+        <Link
+          href={`/partners/${r.partner_id}`}
+          className="font-semibold text-slate-800 hover:text-blue-700 hover:underline text-[0.78rem]"
+        >
+          {r.partner_name}
+        </Link>
+      </td>
+      <td className="px-2 py-1.5 text-slate-500 text-[0.72rem]">
+        {r.partner_register || "—"}
+      </td>
+      <td className="px-2 py-1.5 text-right font-mono">{fmtInt(invoiced)}₮</td>
+      <td className="px-2 py-1.5 text-right font-mono text-emerald-700">
+        {fmtInt(collected)}₮
+      </td>
+      <td
+        className={`px-2 py-1.5 text-right font-mono font-bold ${remaining > 0 ? "text-red-700" : "text-emerald-700"}`}
+      >
+        {fmtInt(remaining)}₮
+      </td>
+      <td className="px-2 py-1.5">
+        <div className="h-1.5 bg-slate-100 rounded overflow-hidden w-20">
+          <div
+            className={`h-full ${matchPct >= 100 ? "bg-emerald-500" : matchPct >= 50 ? "bg-amber-500" : "bg-red-500"}`}
+            style={{ width: `${Math.min(100, matchPct)}%` }}
+          />
+        </div>
+        <div className="text-[0.62rem] text-slate-500 mt-0.5">{matchPct.toFixed(0)}%</div>
+      </td>
+      <td className="px-2 py-1.5 text-center">
+        {r.status === "paid" ? (
+          <span className="inline-block px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded text-[0.65rem] font-semibold">
+            Төлөгдсөн
+          </span>
+        ) : r.status === "partial" ? (
+          <span className="inline-block px-2 py-0.5 bg-amber-100 text-amber-800 rounded text-[0.65rem] font-semibold">
+            Хэсэгчлэн
+          </span>
+        ) : (
+          <span className="inline-block px-2 py-0.5 bg-red-100 text-red-700 rounded text-[0.65rem] font-semibold">
+            Нээлттэй
+          </span>
+        )}
+      </td>
+      <td className="px-2 py-1.5 text-center print:hidden">
+        <Link
+          href={`/partners/${r.partner_id}`}
+          className="inline-flex border border-slate-300 text-slate-700 hover:bg-slate-50 px-1.5 py-1 rounded"
+          title="Дэлгэрэнгүй"
+        >
+          <Eye className="w-3 h-3" />
+        </Link>
+      </td>
+    </tr>
+  );
+}
+
+function KpiCard({
+  label, value, sub, icon, gradient,
+}: {
+  label: string;
+  value: string;
+  sub: React.ReactNode;
+  icon: React.ReactNode;
+  gradient: string;
+}) {
+  return (
+    <div className={`bg-gradient-to-br ${gradient} text-white rounded p-3 shadow-sm`}>
+      <div className="flex items-center justify-between mb-1">
+        <div className="text-xs opacity-90 uppercase tracking-wide font-semibold">{label}</div>
+        {icon}
+      </div>
+      <div className="text-xl font-bold font-mono leading-tight">{value}</div>
+      <div className="text-[0.7rem] opacity-80 mt-0.5">{sub}</div>
     </div>
   );
 }
