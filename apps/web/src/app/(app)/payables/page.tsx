@@ -1,115 +1,412 @@
 import { createClient } from "@/lib/supabase/server";
+import { getCurrentCompany } from "@/lib/supabase/company";
 import Link from "next/link";
-import { Wallet, Plus } from "lucide-react";
-import { fmtDate, fmtMoney } from "@/lib/format";
-import { Pagination } from "@/components/ui/Pagination";
+import {
+  Wallet, FileText, Landmark, Scale, Plus, AlertTriangle, Info, Eye, Search, X,
+} from "lucide-react";
+import { fmtMoney } from "@/lib/format";
 import { ToastFromURL } from "@/components/ui/Toast";
-import { Badge } from "@/components/ui/Badge";
-import { AR_AP_STATUS, AR_AP_STATUS_COLOR, type ArApStatus } from "@/lib/i18n/labels";
+import { PrintButton } from "@/components/ui/PrintButton";
+import {
+  type PayableRpcRow,
+  buildPayableSummary,
+  parseApStatus,
+} from "@/lib/reports/payables";
 
-export const metadata = { title: "Өглөг — Тумэн Accounting" };
+export const metadata = { title: "Өглөгийн бүртгэл — Тумэн Accounting" };
 
-const PAGE_SIZE = 50;
+type SearchParams = Promise<{ status?: string; q?: string }>;
 
-type SearchParams = Promise<{ page?: string; status?: string }>;
+/** NaN-safe number coercion. */
+function safeNum(v: unknown): number {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : 0;
+}
 
-export default async function PayablesPage({ searchParams }: { searchParams: SearchParams }) {
+function fmtInt(n: number): string {
+  return fmtMoney(n).replace(/\.00$/, "");
+}
+
+export default async function PayablesPage({
+  searchParams,
+}: {
+  searchParams: SearchParams;
+}) {
   const sp = await searchParams;
-  const pageNum = Math.max(1, parseInt(sp.page || "1", 10));
-  const offset = (pageNum - 1) * PAGE_SIZE;
+  const status = parseApStatus(sp.status);
+  const q = (sp.q ?? "").trim().slice(0, 100);
 
   const supabase = await createClient();
-  let q = supabase
-    .from("payables")
-    .select("id, invoice_no, invoice_date, due_date, amount, vat_amount, total_amount, paid_amount, remaining, status, partner:partners(id, name)", { count: "exact" })
-    .is("deleted_at", null)
-    .order("invoice_date", { ascending: false })
-    .range(offset, offset + PAGE_SIZE - 1);
+  const company = await getCurrentCompany(supabase);
 
-  if (sp.status) {
-    q = q.eq("status", sp.status as "draft" | "open" | "partial" | "paid" | "overdue" | "cancelled" | "written_off");
+  if (!company) {
+    return (
+      <div className="max-w-5xl mx-auto p-8">
+        <h1 className="text-2xl font-semibold flex items-center gap-2 mb-4">
+          <Wallet className="w-6 h-6" /> Өглөгийн бүртгэл
+        </h1>
+        <div className="bg-amber-50 border border-amber-200 rounded p-4 text-sm text-amber-900">
+          Байгууллага сонгогдоогүй байна.
+        </div>
+      </div>
+    );
   }
 
-  const { data: rows, count } = await q;
-  const totalPages = Math.ceil((count ?? 0) / PAGE_SIZE);
+  // RPC pulls the unfiltered result set so chip counts are accurate; the
+  // status chip filter is then applied client-side. Server-side ILIKE search
+  // narrows the row set early (no point loading thousands of suppliers when
+  // the user typed a name).
+  const { data, error } = await supabase.rpc("fn_payables_by_partner", {
+    p_company_id: company.companyId,
+    p_status: null,
+    p_search: q || null,
+  });
 
-  const totals = (rows ?? []).reduce(
-    (acc, r) => {
-      acc.total += Number(r.total_amount || 0);
-      acc.paid += Number(r.paid_amount || 0);
-      acc.remaining += Number(r.remaining || 0);
-      return acc;
-    },
-    { total: 0, paid: 0, remaining: 0 },
-  );
+  const allRows = (data ?? []) as PayableRpcRow[];
+  const summary = buildPayableSummary(allRows);
+  const filtered = status ? allRows.filter((r) => r.status === status) : allRows;
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3 max-w-[1600px] mx-auto">
       <ToastFromURL />
 
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold text-slate-900 flex items-center gap-2">
-            <Wallet className="w-6 h-6" /> Өглөг
-          </h1>
-          <p className="text-sm text-slate-500">
-            {count ?? 0} нэхэмжлэл · Нийт <span className="font-mono">{fmtMoney(totals.total)}</span> · Төлсөн <span className="font-mono">{fmtMoney(totals.paid)}</span> · Үлдэгдэл <span className="font-mono">{fmtMoney(totals.remaining)}</span>
-          </p>
+      {/* Toolbar */}
+      <div className="flex items-center justify-between flex-wrap gap-2 print:hidden">
+        <h1 className="text-2xl font-semibold text-slate-900 flex items-center gap-2">
+          <Wallet className="w-6 h-6" /> Өглөгийн бүртгэл
+          <span className="text-base text-slate-500 font-normal">
+            — &quot;{company.meta?.name ?? "—"}&quot; ХХК
+          </span>
+        </h1>
+        <div className="flex items-center gap-2">
+          <Link
+            href="/payables/new"
+            className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded text-xs flex items-center gap-1"
+          >
+            <Plus className="w-3.5 h-3.5" /> Өглөг нэмэх
+          </Link>
+          <PrintButton />
         </div>
-        <Link href="/payables/new" className="bg-slate-900 hover:bg-slate-800 text-white px-3 py-2 rounded text-sm font-medium flex items-center gap-2">
-          <Plus className="w-4 h-4" /> Шинэ өглөг
-        </Link>
       </div>
 
-      <div className="flex gap-2 text-xs">
-        <Link href="/payables" className={`px-3 py-1 rounded ${!sp.status ? "bg-slate-900 text-white" : "bg-white border border-slate-200 hover:bg-slate-50"}`}>Бүгд</Link>
-        {Object.entries(AR_AP_STATUS).map(([v, l]) => (
-          <Link key={v} href={`/payables?status=${v}`} className={`px-3 py-1 rounded ${sp.status === v ? "bg-slate-900 text-white" : "bg-white border border-slate-200 hover:bg-slate-50"}`}>{l}</Link>
-        ))}
+      {/* 3 KPI gradient cards (legacy red/purple/orange) */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <KpiCard
+          label="НИЙТ НЭХЭМЖЛЭЛ"
+          value={`${fmtInt(summary.totals.invoiced)}₮`}
+          sub={`${summary.cnt.total} харилцагч`}
+          icon={<FileText className="w-5 h-5" />}
+          gradient="from-red-500 to-red-700"
+        />
+        <KpiCard
+          label="НИЙТ ТӨЛСӨН"
+          value={`${fmtInt(summary.totals.paid)}₮`}
+          sub="Банкны зарлагаар"
+          icon={<Landmark className="w-5 h-5" />}
+          gradient="from-purple-600 to-fuchsia-700"
+        />
+        <KpiCard
+          label="ҮЛДЭГДЭЛ ӨГЛӨГ"
+          value={`${fmtInt(summary.totals.remaining)}₮`}
+          sub="Тулгалтаар"
+          icon={<Scale className="w-5 h-5" />}
+          gradient={summary.totals.remaining > 0
+            ? "from-orange-500 to-orange-700"
+            : "from-emerald-500 to-emerald-700"}
+        />
       </div>
 
-      <div className="bg-white rounded-lg border border-slate-200 overflow-hidden">
-        <table className="w-full text-sm">
-          <thead className="bg-slate-50 text-xs uppercase text-slate-500">
-            <tr>
-              <th className="px-3 py-2 text-left">Нэхэмж №</th>
-              <th className="px-3 py-2 text-left">Огноо</th>
-              <th className="px-3 py-2 text-left">Хугацаа</th>
-              <th className="px-3 py-2 text-left">Нийлүүлэгч</th>
-              <th className="px-3 py-2 text-right">Нийт</th>
-              <th className="px-3 py-2 text-right">Төлсөн</th>
-              <th className="px-3 py-2 text-right">Үлдэгдэл</th>
-              <th className="px-3 py-2 text-center">Статус</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100">
-            {(rows ?? []).map((r) => {
-              const partner = Array.isArray(r.partner) ? r.partner[0] : r.partner;
-              return (
-                <tr key={r.id} className="hover:bg-slate-50">
-                  <td className="px-3 py-2 font-mono text-xs">{r.invoice_no || "—"}</td>
-                  <td className="px-3 py-2 text-xs">{fmtDate(r.invoice_date)}</td>
-                  <td className="px-3 py-2 text-xs text-slate-500">{fmtDate(r.due_date)}</td>
-                  <td className="px-3 py-2 text-xs">
-                    {partner ? <Link href={`/partners/${partner.id}`} className="text-blue-600 hover:underline">{partner.name}</Link> : "—"}
-                  </td>
-                  <td className="px-3 py-2 font-mono text-right text-xs">{fmtMoney(r.total_amount)}</td>
-                  <td className="px-3 py-2 font-mono text-right text-xs text-green-700">{fmtMoney(r.paid_amount)}</td>
-                  <td className="px-3 py-2 font-mono text-right text-xs font-semibold">{fmtMoney(r.remaining)}</td>
-                  <td className="px-3 py-2 text-center">
-                    <Badge color={AR_AP_STATUS_COLOR[r.status as ArApStatus]}>{AR_AP_STATUS[r.status as ArApStatus]}</Badge>
+      {/* Search + status chips */}
+      <div className="bg-white border border-slate-200 rounded p-2 print:hidden">
+        <form method="GET" className="flex items-center flex-wrap gap-2">
+          {/* Hidden status preserves chip-selection unless a chip button
+              overrides via its own name=status value. */}
+          <input type="hidden" name="status" value={status} />
+
+          {/* Search box */}
+          <div className="flex items-center gap-1">
+            <label htmlFor="ap-q" className="sr-only">Хайх</label>
+            <div className="relative">
+              <Search className="w-3 h-3 absolute left-2 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                id="ap-q"
+                type="text"
+                name="q"
+                defaultValue={q}
+                placeholder="Харилцагч нэрээр хайх…"
+                maxLength={100}
+                className="pl-6 pr-2 py-1 border border-slate-300 rounded text-xs w-[240px]"
+              />
+            </div>
+            {q && (
+              <button
+                type="submit"
+                name="q"
+                value=""
+                className="px-1.5 py-1 border border-red-300 text-red-700 rounded text-xs hover:bg-red-50"
+                title="Хайлт цэвэрлэх"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            )}
+          </div>
+
+          {/* Status chips as form buttons — clicked button's value overrides
+              the hidden status input, preserving the current search text. */}
+          <div className="inline-flex rounded border border-slate-300 overflow-hidden text-xs">
+            <ChipButton
+              label="Бүгд"
+              count={summary.cnt.total}
+              active={!status}
+              value=""
+              color="slate"
+            />
+            <ChipButton
+              label="Нээлттэй"
+              count={summary.cnt.open}
+              active={status === "open"}
+              value="open"
+              color="red"
+            />
+            <ChipButton
+              label="Хэсэгчлэн"
+              count={summary.cnt.partial}
+              active={status === "partial"}
+              value="partial"
+              color="amber"
+            />
+            <ChipButton
+              label="Төлөгдсөн"
+              count={summary.cnt.paid}
+              active={status === "paid"}
+              value="paid"
+              color="emerald"
+            />
+          </div>
+
+          <button
+            type="submit"
+            className="px-3 py-1 bg-slate-700 hover:bg-slate-800 text-white rounded text-xs"
+          >
+            Шүүх
+          </button>
+
+          <span className="text-xs text-slate-500 flex items-center gap-1 ml-auto">
+            <Info className="w-3 h-3" />
+            E-Баримт нэхэмжлэл + банкны зарлагаас автоматаар тооцоолсон
+          </span>
+        </form>
+      </div>
+
+      {error && (
+        <div className="bg-red-50 border border-red-200 rounded p-3 text-sm text-red-800 flex items-start gap-2 print:hidden">
+          <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
+          <div>
+            <div className="font-semibold">Өгөгдөл татаж чадсангүй</div>
+            <div className="text-xs opacity-80 mt-0.5">{error.message}</div>
+          </div>
+        </div>
+      )}
+
+      <style>{`
+        @media print {
+          @page { size: A4 landscape; margin: 10mm; }
+          body { background: white; }
+          table { font-size: 8pt !important; }
+          thead { background: #1a3c5e !important; color: white !important; -webkit-print-color-adjust: exact; }
+        }
+      `}</style>
+
+      {/* Table */}
+      <div className="bg-white border border-slate-200 rounded overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs">
+            <thead className="bg-slate-800 text-white">
+              <tr>
+                <th className="px-2 py-2 text-left font-semibold w-24">Код</th>
+                <th className="px-2 py-2 text-left font-semibold">Харилцагч</th>
+                <th className="px-2 py-2 text-left font-semibold w-28">Регистр</th>
+                <th className="px-2 py-2 text-right font-semibold w-32">Нэхэмжлэл</th>
+                <th className="px-2 py-2 text-right font-semibold w-32">Төлсөн</th>
+                <th className="px-2 py-2 text-right font-semibold w-32">Үлдэгдэл</th>
+                <th className="px-2 py-2 text-left font-semibold w-28">Тулгалт</th>
+                <th className="px-2 py-2 text-center font-semibold w-24">Төлөв</th>
+                <th className="px-2 py-2 text-center font-semibold w-14 print:hidden"></th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {filtered.length === 0 ? (
+                <tr>
+                  <td colSpan={9} className="text-center py-10 text-slate-400">
+                    <FileText className="w-8 h-8 mx-auto opacity-30 mb-2" />
+                    {q || status ? "Шүүлтэд тохирох бичлэг алга" : "Бичлэг олдсонгүй"}
                   </td>
                 </tr>
+              ) : (
+                filtered.map((r) => <PayableRowEl key={r.partner_id} r={r} />)
+              )}
+            </tbody>
+            {filtered.length > 0 && (() => {
+              const ft = filtered.reduce(
+                (s, r) => ({
+                  inv: s.inv + safeNum(r.invoiced),
+                  paid: s.paid + safeNum(r.paid),
+                  rem: s.rem + safeNum(r.remaining),
+                }),
+                { inv: 0, paid: 0, rem: 0 },
               );
-            })}
-            {(rows?.length ?? 0) === 0 && (
-              <tr><td colSpan={8} className="px-4 py-8 text-center text-xs text-slate-400">Бичлэг олдсонгүй</td></tr>
-            )}
-          </tbody>
-        </table>
+              return (
+                <tfoot className="bg-blue-50 font-bold">
+                  <tr>
+                    <td colSpan={3} className="px-2 py-1.5 text-right">
+                      Нийт {filtered.length} харилцагч:
+                    </td>
+                    <td className="px-2 py-1.5 text-right font-mono">
+                      {fmtInt(ft.inv)}₮
+                    </td>
+                    <td className="px-2 py-1.5 text-right font-mono text-purple-700">
+                      {fmtInt(ft.paid)}₮
+                    </td>
+                    <td className="px-2 py-1.5 text-right font-mono text-orange-700">
+                      {fmtInt(ft.rem)}₮
+                    </td>
+                    <td colSpan={3}></td>
+                  </tr>
+                </tfoot>
+              );
+            })()}
+          </table>
+        </div>
       </div>
+    </div>
+  );
+}
 
-      <Pagination page={pageNum} totalPages={totalPages} basePath="/payables" search={sp} />
+function ChipButton({
+  label, count, active, value, color,
+}: {
+  label: string;
+  count: number;
+  active: boolean;
+  value: string;
+  color: "slate" | "red" | "amber" | "emerald";
+}) {
+  const palette = {
+    slate:   { active: "bg-slate-700 text-white",   idle: "text-slate-700 hover:bg-slate-50",    badge: "bg-slate-200 text-slate-700"  },
+    red:     { active: "bg-red-600 text-white",     idle: "text-red-700 hover:bg-red-50",        badge: "bg-red-100 text-red-700"       },
+    amber:   { active: "bg-amber-500 text-white",   idle: "text-amber-700 hover:bg-amber-50",    badge: "bg-amber-100 text-amber-700"   },
+    emerald: { active: "bg-emerald-600 text-white", idle: "text-emerald-700 hover:bg-emerald-50", badge: "bg-emerald-100 text-emerald-700" },
+  }[color];
+  return (
+    <button
+      type="submit"
+      name="status"
+      value={value}
+      className={`px-3 py-1 flex items-center gap-1 border-r border-slate-200 last:border-r-0 ${active ? palette.active : palette.idle}`}
+    >
+      {label}
+      <span className={`px-1.5 py-0.5 rounded text-[0.65rem] ${active ? "bg-white/25" : palette.badge}`}>
+        {count}
+      </span>
+    </button>
+  );
+}
+
+function PayableRowEl({ r }: { r: PayableRpcRow }) {
+  const invoiced = safeNum(r.invoiced);
+  const paid = safeNum(r.paid);
+  const remaining = safeNum(r.remaining);
+  const diff = safeNum(r.diff);
+  const matchPct = safeNum(r.match_pct);
+
+  return (
+    <tr className={diff < -1 ? "bg-blue-50/40 hover:bg-blue-50" : "hover:bg-slate-50"}>
+      <td className="px-2 py-1.5 text-slate-500 font-mono text-[0.72rem]">
+        {r.partner_code || "—"}
+      </td>
+      <td className="px-2 py-1.5">
+        <Link
+          href={`/partners/${r.partner_id}`}
+          className="font-semibold text-slate-800 hover:text-blue-700 hover:underline text-[0.78rem]"
+        >
+          {r.partner_name}
+        </Link>
+      </td>
+      <td className="px-2 py-1.5 text-slate-500 text-[0.72rem]">
+        {r.partner_register || "—"}
+      </td>
+      <td className="px-2 py-1.5 text-right font-mono">{fmtInt(invoiced)}₮</td>
+      <td className="px-2 py-1.5 text-right font-mono text-purple-700">
+        {fmtInt(paid)}₮
+      </td>
+      {/*
+        Legacy renders diff (can be negative = overpaid) as the headline, with
+        red for remaining > 0 and blue for overpaid. `remaining` itself is
+        always ≥0 (max with 0); we use `diff` to color and prefix the sign.
+      */}
+      <td
+        className={`px-2 py-1.5 text-right font-mono font-bold ${
+          diff > 1 ? "text-red-700"
+          : diff < -1 ? "text-blue-700"
+          : "text-emerald-700"
+        }`}
+      >
+        {diff > 1 ? fmtInt(remaining) : diff < -1 ? `+${fmtInt(-diff)}` : "—"}₮
+      </td>
+      <td className="px-2 py-1.5">
+        <div className="h-1.5 bg-slate-100 rounded overflow-hidden w-20">
+          <div
+            className={`h-full ${matchPct >= 100 ? "bg-emerald-500" : matchPct >= 50 ? "bg-amber-500" : "bg-red-500"}`}
+            style={{ width: `${Math.min(100, matchPct)}%` }}
+          />
+        </div>
+        <div className="text-[0.62rem] text-slate-500 mt-0.5">{matchPct.toFixed(0)}%</div>
+      </td>
+      <td className="px-2 py-1.5 text-center">
+        {r.status === "paid" ? (
+          <span className="inline-block px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded text-[0.65rem] font-semibold">
+            Төлөгдсөн
+          </span>
+        ) : r.status === "partial" ? (
+          <span className="inline-block px-2 py-0.5 bg-amber-100 text-amber-800 rounded text-[0.65rem] font-semibold">
+            Хэсэгчлэн
+          </span>
+        ) : (
+          <span className="inline-block px-2 py-0.5 bg-red-100 text-red-700 rounded text-[0.65rem] font-semibold">
+            Нээлттэй
+          </span>
+        )}
+      </td>
+      <td className="px-2 py-1.5 text-center print:hidden">
+        <Link
+          href={`/partners/${r.partner_id}`}
+          className="inline-flex border border-slate-300 text-slate-700 hover:bg-slate-50 px-1.5 py-1 rounded"
+          title="Дэлгэрэнгүй"
+        >
+          <Eye className="w-3 h-3" />
+        </Link>
+      </td>
+    </tr>
+  );
+}
+
+function KpiCard({
+  label, value, sub, icon, gradient,
+}: {
+  label: string;
+  value: string;
+  sub: React.ReactNode;
+  icon: React.ReactNode;
+  gradient: string;
+}) {
+  return (
+    <div className={`bg-gradient-to-br ${gradient} text-white rounded p-3 shadow-sm`}>
+      <div className="flex items-center justify-between mb-1">
+        <div className="text-xs opacity-90 uppercase tracking-wide font-semibold">{label}</div>
+        {icon}
+      </div>
+      <div className="text-xl font-bold font-mono leading-tight">{value}</div>
+      <div className="text-[0.7rem] opacity-80 mt-0.5">{sub}</div>
     </div>
   );
 }
