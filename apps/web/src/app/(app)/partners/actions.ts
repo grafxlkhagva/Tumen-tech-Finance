@@ -124,3 +124,39 @@ export async function updatePartner(
     return actionError(e);
   }
 }
+
+// ---------------------------------------------------------------------------
+// MERGE — fold duplicate partners into one canonical record
+// ---------------------------------------------------------------------------
+export async function mergePartners(
+  primaryId: string,
+  mergeIds: string[],
+): Promise<ActionResult> {
+  if (!primaryId) return { error: "Үндсэн харилцагч сонгогдоогүй" };
+  const dedup = [...new Set(mergeIds.filter((id) => id && id !== primaryId))];
+  if (dedup.length === 0) return { error: "Нэгтгэх харилцагч сонгогдоогүй" };
+
+  const supabase = await createClient();
+  const { data: uc } = await supabase
+    .from("user_companies")
+    .select("company_id")
+    .order("is_default", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (!uc?.company_id) return { error: "Компани олдсонгүй" };
+
+  try {
+    const { data, error } = await supabase.rpc("fn_merge_partners", {
+      p_company_id: uc.company_id,
+      p_primary_id: primaryId,
+      p_merge_ids: dedup,
+    });
+    if (error) return { error: error.message };
+    const res = data as { success: boolean; error?: string; merged?: number } | null;
+    if (!res?.success) return { error: res?.error ?? "Нэгтгэх амжилтгүй" };
+    revalidatePath("/partners");
+    return { success: `${res.merged ?? dedup.length} харилцагч нэгтгэгдсэн`, data: { merged: res.merged ?? dedup.length } };
+  } catch (e) {
+    return actionError(e);
+  }
+}
