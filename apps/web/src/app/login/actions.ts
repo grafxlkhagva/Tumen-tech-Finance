@@ -74,10 +74,12 @@ export async function requestPasswordReset(
 
   const supabase = await createClient();
   const origin = await getOrigin();
-  // The link in the email lands on /auth/callback, which exchanges the code
-  // for a recovery session and then forwards to /auth/update-password.
+  // Point straight at the update-password page. Supabase recovery links carry
+  // the token either as `?code=` (PKCE) or in the URL `#hash` (implicit). A
+  // server route can't read the hash, so the landing page is a CLIENT page
+  // whose browser client auto-detects both forms (detectSessionInUrl).
   const { error } = await supabase.auth.resetPasswordForEmail(email, {
-    redirectTo: `${origin}/auth/callback?next=/auth/update-password`,
+    redirectTo: `${origin}/auth/update-password`,
   });
 
   if (error) {
@@ -91,28 +93,6 @@ export async function requestPasswordReset(
   };
 }
 
-// ---------------------------------------------------------------------------
-// UPDATE PASSWORD — set a new password (requires an active recovery session)
-// ---------------------------------------------------------------------------
-export async function updatePassword(
-  _prev: ResetState | undefined,
-  formData: FormData,
-): Promise<ResetState> {
-  const password = String(formData.get("password") || "");
-  const confirm = String(formData.get("confirm") || "");
-
-  if (password.length < 8) return { error: "Нууц үг доод тал нь 8 тэмдэгт байх ёстой" };
-  if (password !== confirm) return { error: "Нууц үг хоорондоо таарахгүй байна" };
-
-  const supabase = await createClient();
-  // Must already be in a (recovery) session — set by /auth/callback.
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) {
-    return { error: "Сесс хүчингүй болсон байна. Сэргээх холбоосыг дахин авна уу." };
-  }
-
-  const { error } = await supabase.auth.updateUser({ password });
-  if (error) return { error: error.message };
-
-  redirect(`/login?flash=${encodeURIComponent("Нууц үг амжилттай шинэчлэгдлээ. Нэвтэрнэ үү.")}&type=success`);
-}
+// NOTE: setting the new password happens CLIENT-side in
+// /auth/update-password (UpdatePasswordForm) because the recovery token may
+// arrive in the URL hash, which never reaches the server. See that component.
