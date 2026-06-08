@@ -1,4 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { redirect } from "next/navigation";
+import { createClient } from "./server";
 
 /**
  * Тухайн нэвтэрсэн user-ийн default компани (`is_default = true`)-г буцаана.
@@ -44,4 +46,28 @@ export async function getCurrentCompany(
     : null;
 
   return { companyId: data.company_id, meta };
+}
+
+/**
+ * Guard for admin-only server code (pages + actions). Redirects to /login if
+ * unauthenticated, or to / with an error flash if the user isn't an admin of
+ * their default company. Returns the verified userId + companyId on success.
+ */
+export async function requireAdmin(): Promise<{ userId: string; companyId: string }> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) redirect("/login");
+
+  const { data: uc } = await supabase
+    .from("user_companies")
+    .select("company_id, role")
+    .eq("user_id", user.id)
+    .order("is_default", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (!uc || uc.role !== "admin") {
+    redirect(`/?flash=${encodeURIComponent("Энэ хэсэгт зөвхөн админ хандах эрхтэй.")}&type=error`);
+  }
+  return { userId: user.id, companyId: uc.company_id };
 }

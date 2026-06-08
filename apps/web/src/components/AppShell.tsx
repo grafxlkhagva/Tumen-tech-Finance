@@ -7,11 +7,19 @@ import {
   Receipt, Briefcase, LogOut, Settings, ChevronLeft, Menu,
   Banknote, Landmark, HandCoins, Wallet, ScrollText, FileSpreadsheet,
   TrendingUp, PieChart, FileBarChart2, Building2, Coins, Link2,
-  ReceiptText,
+  ReceiptText, Shield,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 
-const NAV = [
+type NavItem = {
+  href: string;
+  label: string;
+  icon: typeof LayoutDashboard;
+  section: string;
+  adminOnly?: boolean;
+};
+
+const NAV: NavItem[] = [
   // Гол
   { href: "/",                  label: "Хяналтын самбар",      icon: LayoutDashboard, section: "Гол" },
 
@@ -53,6 +61,9 @@ const NAV = [
 
   // Маягт
   { href: "/forms",             label: "Анхан шатны маягт",    icon: FileSpreadsheet, section: "Маягт" },
+
+  // Удирдлага (зөвхөн админ)
+  { href: "/admin/users",       label: "Хэрэглэгчид",          icon: Shield,          section: "Удирдлага", adminOnly: true },
 ];
 
 export default function AppShell({
@@ -96,7 +107,7 @@ export default function AppShell({
         </div>
 
         <nav className="flex-1 overflow-y-auto py-2">
-          {NAV.map((item) => {
+          {NAV.filter((item) => !item.adminOnly || role === "admin").map((item) => {
             const showSection = item.section !== lastSection;
             lastSection = item.section;
             const active = pathname === item.href ||
