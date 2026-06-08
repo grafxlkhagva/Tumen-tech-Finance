@@ -1,10 +1,19 @@
 "use client";
 
 import { useActionState } from "react";
+import Link from "next/link";
 import { loginAction, type LoginState } from "./actions";
 import { LogIn } from "lucide-react";
 
-export default function LoginForm({ next }: { next: string }) {
+export default function LoginForm({
+  next,
+  flash,
+  flashType,
+}: {
+  next: string;
+  flash?: string;
+  flashType?: string;
+}) {
   const [state, formAction, pending] = useActionState<LoginState | undefined, FormData>(
     loginAction,
     undefined,
@@ -20,6 +29,18 @@ export default function LoginForm({ next }: { next: string }) {
           <h1 className="text-2xl font-semibold text-slate-900">Тумэн Accounting</h1>
           <p className="text-sm text-slate-500 mt-1">Системд нэвтрэх</p>
         </div>
+
+        {flash && !state?.error && (
+          <div
+            className={`mb-4 px-3 py-2 text-sm rounded border ${
+              flashType === "error"
+                ? "bg-red-50 border-red-200 text-red-700"
+                : "bg-emerald-50 border-emerald-200 text-emerald-700"
+            }`}
+          >
+            {flash}
+          </div>
+        )}
 
         {state?.error && (
           <div className="mb-4 px-3 py-2 bg-red-50 border border-red-200 text-red-700 text-sm rounded">
@@ -46,9 +67,14 @@ export default function LoginForm({ next }: { next: string }) {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1.5">
-              Нууц үг
-            </label>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="block text-sm font-medium text-slate-700">
+                Нууц үг
+              </label>
+              <Link href="/login/forgot" className="text-xs text-slate-500 hover:text-slate-800">
+                Нууц үг мартсан уу?
+              </Link>
+            </div>
             <input
               type="password"
               name="password"
