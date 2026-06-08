@@ -20,22 +20,34 @@ export default async function AdminUsersPage() {
     (ucs ?? []).map((u) => [u.user_id, { role: u.role as string, isDefault: !!u.is_default }]),
   );
 
-  // Auth users (service role — emails + sign-in metadata)
-  const admin = createAdminClient();
-  const { data: list, error } = await admin.auth.admin.listUsers({ perPage: 1000 });
-
-  const rows: UserRow[] = (list?.users ?? [])
-    .filter((u) => roleByUser.has(u.id)) // only users belonging to this company
-    .map((u) => ({
-      id: u.id,
-      email: u.email ?? "—",
-      role: roleByUser.get(u.id)?.role ?? "viewer",
-      isDefault: roleByUser.get(u.id)?.isDefault ?? false,
-      confirmed: !!u.email_confirmed_at,
-      lastSignIn: u.last_sign_in_at ?? null,
-      createdAt: u.created_at ?? null,
-    }))
-    .sort((a, b) => a.email.localeCompare(b.email));
+  // Auth users (service role — emails + sign-in metadata). Wrapped so a
+  // missing/invalid SUPABASE_SERVICE_ROLE_KEY (e.g. not set on the host)
+  // degrades to a friendly banner instead of crashing the whole page.
+  let rows: UserRow[] = [];
+  let loadError: string | null = null;
+  try {
+    const admin = createAdminClient();
+    const { data: list, error } = await admin.auth.admin.listUsers({ perPage: 1000 });
+    if (error) {
+      loadError = error.message;
+    } else {
+      rows = (list?.users ?? [])
+        .filter((u) => roleByUser.has(u.id)) // only this company's members
+        .map((u) => ({
+          id: u.id,
+          email: u.email ?? "—",
+          role: roleByUser.get(u.id)?.role ?? "viewer",
+          isDefault: roleByUser.get(u.id)?.isDefault ?? false,
+          confirmed: !!u.email_confirmed_at,
+          lastSignIn: u.last_sign_in_at ?? null,
+          createdAt: u.created_at ?? null,
+        }))
+        .sort((a, b) => a.email.localeCompare(b.email));
+    }
+  } catch (e) {
+    loadError =
+      e instanceof Error ? e.message : "Хэрэглэгчдийн жагсаалтыг татаж чадсангүй";
+  }
 
   return (
     <div className="space-y-4 max-w-[1100px] mx-auto">
@@ -48,9 +60,13 @@ export default async function AdminUsersPage() {
         <span className="text-sm text-slate-500">{rows.length} хэрэглэгч</span>
       </div>
 
-      {error && (
+      {loadError && (
         <div className="bg-red-50 border border-red-200 rounded p-3 text-sm text-red-800">
-          Хэрэглэгчдийг татаж чадсангүй: {error.message}
+          <div className="font-semibold">Хэрэглэгчдийг татаж чадсангүй</div>
+          <div className="text-xs opacity-80 mt-1">{loadError}</div>
+          <div className="text-xs opacity-80 mt-1">
+            Серверт <code>SUPABASE_SERVICE_ROLE_KEY</code> орчны хувьсагч тохируулагдсан эсэхийг шалгана уу.
+          </div>
         </div>
       )}
 
