@@ -1,9 +1,9 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import Link from "next/link";
 import { loginAction, type LoginState } from "./actions";
-import { LogIn } from "lucide-react";
+import { LogIn, Eye, EyeOff } from "lucide-react";
 
 export default function LoginForm({
   next,
@@ -18,6 +18,7 @@ export default function LoginForm({
     loginAction,
     undefined,
   );
+  const [showPassword, setShowPassword] = useState(false);
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 to-slate-700 p-4">
@@ -75,14 +76,26 @@ export default function LoginForm({
                 Нууц үг мартсан уу?
               </Link>
             </div>
-            <input
-              type="password"
-              name="password"
-              required
-              autoComplete="current-password"
-              placeholder="••••••••"
-              className="w-full px-3 py-2 border border-slate-300 rounded focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-transparent text-sm"
-            />
+            <div className="relative">
+              <input
+                type={showPassword ? "text" : "password"}
+                name="password"
+                required
+                autoComplete="current-password"
+                placeholder="••••••••"
+                className="w-full px-3 py-2 pr-10 border border-slate-300 rounded focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-transparent text-sm"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword((v) => !v)}
+                tabIndex={-1}
+                aria-label={showPassword ? "Нууц үг нуух" : "Нууц үг харах"}
+                title={showPassword ? "Нууц үг нуух" : "Нууц үг харах"}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+              >
+                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+            </div>
           </div>
 
           <button
