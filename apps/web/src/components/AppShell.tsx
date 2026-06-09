@@ -7,7 +7,7 @@ import {
   Receipt, Briefcase, LogOut, Settings, ChevronLeft, Menu,
   Banknote, Landmark, HandCoins, Wallet, ScrollText, FileSpreadsheet,
   TrendingUp, PieChart, FileBarChart2, Building2, Coins, Link2,
-  ReceiptText, Shield,
+  ReceiptText, Shield, FileUp,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 
@@ -32,6 +32,7 @@ const NAV: NavItem[] = [
   { href: "/cash",              label: "Банкны хуулга",        icon: Banknote,        section: "Мөнгөн хөрөнгө" },
   { href: "/cash/summary",      label: "Нэгтгэл",              icon: PieChart,        section: "Мөнгөн хөрөнгө" },
   { href: "/cash/bank-summary", label: "Банкны нэгтгэл",       icon: Landmark,        section: "Мөнгөн хөрөнгө" },
+  { href: "/cash/import",       label: "Дансны хуулга оруулагч", icon: FileUp,        section: "Мөнгөн хөрөнгө" },
 
   // Татвар
   { href: "/vat",               label: "НӨАТ бүртгэл",         icon: Receipt,         section: "Татвар" },
